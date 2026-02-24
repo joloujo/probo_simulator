@@ -11,7 +11,7 @@ Measurement = TypeVar("Measurement", bound=object)
 
 class Sensor(ABC, Generic[State, Measurement]):
     """
-    An abstract class for robots
+    An abstract class for sensors
     """
 
     def __init__(self, period: float) -> None:
@@ -22,13 +22,39 @@ class Sensor(ABC, Generic[State, Measurement]):
 
     @abstractmethod
     def ground_truth(self, state: State) -> Measurement:
-        pass
+        """
+        Make a ground truth measurement
+
+        Params:
+            state: The state to base the measurement on
+
+        Returns:
+            the ground truth measurement with no noise
+        """
     
     @abstractmethod
     def noisify(self, measurement: Measurement) -> Measurement:
-        pass
+        """
+        Add noise to the measurement
+
+        Params:
+            measurement: The measurement to add noise to
+        
+        Returns:
+            the measurement with noise
+        """
 
     def measure(self, state: State, time: float) -> Measurement | None:
+        """
+        Make a noisy measurement if able. If a measurement was made, reset the time of the most recent measurement
+
+        Params:
+            state: The state to base the measurement on
+            time: The current time
+
+        Returns:
+            the noisy measurement if able, otherwise None
+        """
         if time < self.last_measurement + self.period:
             return None
         self.last_measurement = time

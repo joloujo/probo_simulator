@@ -15,19 +15,51 @@ class Robot(ABC, Generic[State, Control]):
     """
 
     def __init__(self, state: State) -> None:
+        """
+        Create the robot
+        """
         super().__init__()
         self.state = state
 
     @classmethod
     @abstractmethod
     def kinematics(cls, start: State, control: Control, dt: float) -> State:
-        pass
+        """
+        Compute the new state from an old state and a control command over a timestep.
+        This function is not noisy, it is pure kinematics
+
+        Params:
+            start: The initial state
+            control: The command to follow
+            dt: the length of the timestep
+        
+        Returns:
+            the new state 
+        """
 
     @abstractmethod
     def noisify(self, control: Control) -> Control:
-        pass
+        """
+        Add noise to the control command
+
+        Params:
+            control: The command to add noise to
+        
+        Returns:
+            the control command with noise
+        """
 
     def step(self, control: Control, dt: float) -> State:
+        """
+        Calculate a new, noisy state for a given control command
+
+        Params:
+            control: The command to follow
+            dt: the length of the timestep
+        
+        Returns:
+            the new state 
+        """
         return self.kinematics(self.state, self.noisify(control), dt)
 
 @dataclass
