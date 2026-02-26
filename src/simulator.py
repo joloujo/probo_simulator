@@ -1,14 +1,47 @@
-from typing import TypeVar
+from dataclasses import dataclass
+from typing import Any, Collection, Generic, Sequence, TypeVar 
 
 from environment import Environment
 from robots import Robot
 from sensors import Sensor
 from utils import Pose
 
-RobotState = TypeVar("RobotState", bound=Pose)
-RobotControl = TypeVar("RobotControl", bound=object)
-SensorState = TypeVar("SensorState", bound=object) 
-SensorMeasurement = TypeVar("SensorMeasurement", bound=object)
+
+# Results class modified from ChatGPT :)
+
+RESULTS_SENSOR = TypeVar("RESULTS_SENSOR")
+RESULTS_MEASUREMENT = TypeVar("RESULTS_MEASUREMENT")
+
+class Results:
+    def __init__(self) -> None:
+        self._data: dict[Sensor[Any, Any], list[Any]] = {}
+
+    def __getitem__(self, sensor: Sensor[RESULTS_SENSOR, RESULTS_MEASUREMENT]) -> list[RESULTS_MEASUREMENT]:
+        # The cast is safe because _append preserved the pairing
+        from typing import cast
+        return cast(list[RESULTS_MEASUREMENT], self._data.get(sensor, []))
+
+    def append(self, sensor: Sensor[RESULTS_SENSOR, RESULTS_MEASUREMENT], measurement: RESULTS_MEASUREMENT) -> None:
+        if sensor not in self._data:
+            self._data[sensor] = []
+        self._data[sensor].append(measurement)
+
+
+RC_STATE = TypeVar("RC_STATE", bound=Pose)
+RC_CONTROL = TypeVar("RC_CONTROL")
+
+@dataclass
+class RobotControl(Generic[RC_STATE, RC_CONTROL]):
+    robot: Robot[RC_STATE, RC_CONTROL]
+    controls: Sequence[RC_CONTROL]
+
+SS_STATE = TypeVar("SS_STATE")
+SS_MEASUREMENT = TypeVar("SS_MEASUREMENT")
+
+@dataclass
+class SensorState(Generic[SS_STATE, SS_MEASUREMENT]):
+    sensor: Sensor[SS_STATE, SS_MEASUREMENT]
+    state: SS_STATE
 
 class Simulator:
     """
@@ -16,8 +49,8 @@ class Simulator:
     """
     def __init__(self,
         environment: Environment,
-        robots_with_control: dict[Robot[RobotState, RobotControl], list[RobotControl]],
-        sensors_with_state: dict[Sensor[SensorState, SensorMeasurement], SensorState],
+        robots: Collection[RobotControl],
+        sensors: Collection[SensorState],
         dt: float,
     ) -> None:
         """
@@ -30,8 +63,8 @@ class Simulator:
             dt: the length of one simulation timestep
         """
         self.environment = environment
-        self.robots_with_control = robots_with_control
-        self.sensors_with_state = sensors_with_state
+        self.robots = robots
+        self.sensors = sensors
         self.dt = dt
         self.i = 0
     
@@ -71,18 +104,19 @@ class Simulator:
         Execute one timestep in the simulation
         """
         # Update state
-        for robot, control in self.robots_with_control.items():
-            new_state = robot.step(control[self.i], self.dt)
+        for binding in self.robots:
+            if len(binding.controls) > self.i:
+                new_state = binding.robot.step(binding.controls[self.i], self.dt)
 
-            # Don't update the robots position if it collides with something
-            # TODO: Make this slide or go partway instead of just stopping
-            if self.valid_pose(new_state):
-                robot.state = new_state
+                # Don't update the robots position if it collides with something
+                # TODO: Make this slide or go partway instead of just stopping
+                if self.valid_pose(new_state):
+                    binding.robot.state = new_state
 
         # update the time
         self.i += 1
 
-    def measure(self) -> dict[Sensor[object, SensorMeasurement], SensorMeasurement]:
+    def measure(self, results: Results):
         """
         Take measurements from all sensors
 
@@ -92,31 +126,25 @@ class Simulator:
         measurements = {}
 
         # Take measurements
-        for sensor, state, in self.sensors_with_state.items():
-            measurement = sensor.measure(state, self.time)
+        for binding in self.sensors:
+            measurement = binding.sensor.measure(binding.state, self.time)
             if measurement is not None:
-                measurements[sensor] = measurement
+                results.append(binding.sensor, measurement)
         
         return measurements
 
-    def run(self) -> dict[Sensor[object, SensorMeasurement], list[SensorMeasurement]]:
+    def run(self) -> Results:
         """
         Run the simulation
         
         Returns:
             a dictionary where the keys are the sensors in the simulation, and the values are the lists of measurements over time
         """
-        steps: float = min([len(control) for control in self.robots_with_control.values()])
-
-        # This assumes that all sensors return on the first measurement, which should 
-        # be true because the last_measurement field defaults to -inf
-        results: dict[Sensor[object, SensorMeasurement], list[SensorMeasurement]] = {}
-        for sensor, measurement in self.measure().items():
-            results[sensor] = [measurement]
+        steps = min([len(binding.controls) for binding in self.robots])
+        results = Results()
 
         for _ in range(steps):
             self.step()
-            for sensor, measurement in self.measure().items():
-                results[sensor].append(measurement)
+            self.measure(results)
             
         return results

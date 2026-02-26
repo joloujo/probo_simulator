@@ -1,5 +1,6 @@
 from math import cos, sin
 import matplotlib.pyplot as plt
+from typing import Sequence
 
 from environment import Environment
 from utils import Bounds, Pose, Vector
@@ -54,7 +55,7 @@ class Visualizer:
 
         self.ax.quiver(pose.pos.x, pose.pos.y, u, v, **kwargs)
     
-    def plot_poses(self, poses: list[Pose], **kwargs):
+    def plot_poses(self, poses: Sequence[Pose], **kwargs):
         """
         Display a list of poses on the plot
         
@@ -62,15 +63,10 @@ class Visualizer:
             poses: The poses to plot
         """
         # Create a list of xs and ys for plotting and thetas for calculating u and v
-        x: list[float]
-        y: list[float]
-        theta: list[float]
-        x, y, theta = map(list, zip(*[(pose.pos.x, pose.pos.y, pose.theta) for pose in poses]))
+        x, y, theta = map(list[float], zip(*[(pose.pos.x, pose.pos.y, pose.theta) for pose in poses]))
 
         # Calculate the components of the arrows
-        u: list[float]
-        v: list[float]
-        u, v = map(list, zip(*[(cos(t), sin(t)) for t in theta]))
+        u, v = map(list[float], zip(*[(cos(t), sin(t)) for t in theta]))
 
         # Plot the arrows
         self.ax.quiver(x, y, u, v, **kwargs)

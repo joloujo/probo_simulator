@@ -7,7 +7,7 @@ from typing import Generic, TypeVar
 from utils import Pose, Vector
 
 State = TypeVar("State", bound=Pose) 
-Control = TypeVar("Control", bound=object) 
+Control = TypeVar("Control") 
 
 class Robot(ABC, Generic[State, Control]):
     """
@@ -73,9 +73,12 @@ class DifferentialDriveControl():
     w: float = 0.0
 
 class DifferentialDrive(Robot[DifferentialDriveState, DifferentialDriveControl]):
-    def __init__(self, state: DifferentialDriveState = DifferentialDriveState(), variance: DifferentialDriveControl = DifferentialDriveControl()) -> None:
-        super().__init__(state)
-        self.variance = variance
+    def __init__(self, 
+        state: DifferentialDriveState | None = None, 
+        variance: DifferentialDriveControl | None = None,
+    ) -> None:
+        super().__init__(state if state is not None else DifferentialDriveState())
+        self.variance = variance if variance is not None else DifferentialDriveControl()
     
     @classmethod
     def kinematics(cls, start: DifferentialDriveState, control: DifferentialDriveControl, dt: float) -> DifferentialDriveState:
@@ -128,9 +131,9 @@ class HolonomicDriveControl():
     w: float = 0.0
 
 class HolonomicDrive(Robot[HolonomicDriveState, HolonomicDriveControl]):
-    def __init__(self, state: HolonomicDriveState = HolonomicDriveState(), variance: HolonomicDriveControl = HolonomicDriveControl()) -> None:
-        super().__init__(state)
-        self.variance = variance
+    def __init__(self, state: HolonomicDriveState | None = None, variance: HolonomicDriveControl | None = None) -> None:
+        super().__init__(state if state is not None else HolonomicDriveState())
+        self.variance = variance if variance is not None else HolonomicDriveControl()
     
     @classmethod
     def kinematics(cls, start: HolonomicDriveState, control: HolonomicDriveControl, dt: float) -> HolonomicDriveState:

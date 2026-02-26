@@ -2,13 +2,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from math import sqrt
 from random import gauss
-from typing import Generic, TypeVar
+from typing import Generic, Sequence, TypeVar
 
 from robots import Robot, DifferentialDrive, HolonomicDrive
 from utils import Pose, Vector
 
-State = TypeVar("State", bound=object) 
-Measurement = TypeVar("Measurement", bound=object)
+State = TypeVar("State") 
+Measurement = TypeVar("Measurement")
 
 class Sensor(ABC, Generic[State, Measurement]):
     """
@@ -17,7 +17,6 @@ class Sensor(ABC, Generic[State, Measurement]):
 
     def __init__(self, period: float) -> None:
         super().__init__()
-        self.robot = Robot
         self.period = period
         self.last_measurement: float = float('-inf')
 
@@ -63,9 +62,9 @@ class Sensor(ABC, Generic[State, Measurement]):
 
 
 class GPS(Sensor[Robot, Pose]):
-    def __init__(self, period: float = 0.0, variance: Pose = Pose()) -> None:
+    def __init__(self, period: float = 0.0, variance: Pose | None = None) -> None:
         super().__init__(period)
-        self.variance = variance
+        self.variance = variance if variance is not None else Pose() 
     
     def ground_truth(self, state: Robot) -> Pose:
         return state.state
@@ -87,9 +86,9 @@ class IMUMeasurement:
     w: float = 0.0
 
 class IMU(Sensor[HolonomicDrive, IMUMeasurement]):
-    def __init__(self, period: float, variance: IMUMeasurement = IMUMeasurement()) -> None:
+    def __init__(self, period: float, variance: IMUMeasurement | None = None) -> None:
         super().__init__(period)
-        self.variance = variance
+        self.variance = variance if variance is not None else IMUMeasurement()
 
     def ground_truth(self, state: HolonomicDrive) -> IMUMeasurement:
         return IMUMeasurement(
@@ -112,9 +111,9 @@ class EncoderMeasurement:
     w: float = 0.0
 
 class Encoder(Sensor[DifferentialDrive, EncoderMeasurement]):
-    def __init__(self, period: float, variance: EncoderMeasurement = EncoderMeasurement()) -> None:
+    def __init__(self, period: float, variance: EncoderMeasurement | None = None) -> None:
         super().__init__(period)
-        self.variance = variance
+        self.variance = variance if variance is not None else EncoderMeasurement()
 
     def ground_truth(self, state: DifferentialDrive) -> EncoderMeasurement:
         return EncoderMeasurement(
@@ -132,11 +131,11 @@ class Encoder(Sensor[DifferentialDrive, EncoderMeasurement]):
 @dataclass
 class PingerState:
     robot: Robot
-    landmarks: list[Vector]
+    landmarks: Sequence[Vector]
 
 @dataclass
 class PingerMeasurement:
-    pings: list[Vector] = field(default_factory=list)
+    pings: Sequence[Vector]
 
 class Pinger(Sensor[PingerState, PingerMeasurement]):
     def __init__(self, range: float, period: float, variance: tuple[float, float] = (0.0, 0.0)) -> None:
