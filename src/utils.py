@@ -101,11 +101,3 @@ class Bounds:
         Return if a location is inside the bounds
         """
         return self.min.x <= vec.x <= self.max.x and self.min.y <= vec.y <= self.max.y
-    
-@dataclass
-class Landmark:
-    """
-    A landmark in the world
-    """
-    pos: Vector = field(default_factory=new_vector)
-    id: int = 0

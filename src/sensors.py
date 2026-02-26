@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from math import sqrt
 from random import gauss
 from typing import Generic, TypeVar
 
-from robots import Robot
+from robots import Robot, DifferentialDrive, HolonomicDrive
 from utils import Pose, Vector
 
 State = TypeVar("State", bound=object) 
@@ -77,3 +78,95 @@ class GPS(Sensor[Robot, Pose]):
             ),
             gauss(measurement.theta, sqrt(self.variance.theta))
         )
+
+
+@dataclass
+class IMUMeasurement:
+    xv: float = 0.0
+    yv: float = 0.0
+    w: float = 0.0
+
+class IMU(Sensor[HolonomicDrive, IMUMeasurement]):
+    def __init__(self, period: float, variance: IMUMeasurement = IMUMeasurement()) -> None:
+        super().__init__(period)
+        self.variance = variance
+
+    def ground_truth(self, state: HolonomicDrive) -> IMUMeasurement:
+        return IMUMeasurement(
+            state.state.xv,
+            state.state.yv,
+            state.state.w,
+        )
+    
+    def noisify(self, measurement: IMUMeasurement) -> IMUMeasurement:
+        return IMUMeasurement(
+            gauss(measurement.xv, sqrt(self.variance.xv)),
+            gauss(measurement.yv, sqrt(self.variance.yv)),
+            gauss(measurement.w, sqrt(self.variance.w))
+        )
+
+
+@dataclass
+class EncoderMeasurement:
+    v: float = 0.0
+    w: float = 0.0
+
+class Encoder(Sensor[DifferentialDrive, EncoderMeasurement]):
+    def __init__(self, period: float, variance: EncoderMeasurement = EncoderMeasurement()) -> None:
+        super().__init__(period)
+        self.variance = variance
+
+    def ground_truth(self, state: DifferentialDrive) -> EncoderMeasurement:
+        return EncoderMeasurement(
+            state.state.v,
+            state.state.w,
+        )
+    
+    def noisify(self, measurement: EncoderMeasurement) -> EncoderMeasurement:
+        return EncoderMeasurement(
+            gauss(measurement.v, sqrt(self.variance.v)),
+            gauss(measurement.w, sqrt(self.variance.w))
+        )
+
+
+@dataclass
+class PingerState:
+    robot: Robot
+    landmarks: list[Vector]
+
+@dataclass
+class PingerMeasurement:
+    pings: list[Vector] = field(default_factory=list)
+
+class Pinger(Sensor[PingerState, PingerMeasurement]):
+    def __init__(self, range: float, period: float, variance: tuple[float, float] = (0.0, 0.0)) -> None:
+        super().__init__(period)
+        self.range = range
+        self.variance = variance
+
+    def ground_truth(self, state: PingerState) -> PingerMeasurement:
+        pings: list[Vector] = []
+
+        for landmark in state.landmarks:
+
+            difference: Vector = landmark - state.robot.state.pos
+            r = difference.r
+            theta = difference.theta - state.robot.state.theta
+
+            pings.append(Vector.polar(r, theta))
+
+        return PingerMeasurement(pings)
+    
+    def noisify(self, measurement: PingerMeasurement) -> PingerMeasurement:
+        noisy_pings = [
+            Vector.polar(
+                gauss(ping.r, sqrt(self.variance[0])),
+                gauss(ping.theta, sqrt(self.variance[1]))
+            ) for ping in measurement.pings
+        ]
+
+        ranged_pings = [
+            ping for ping in noisy_pings if ping.r <= self.range
+        ]
+
+        return PingerMeasurement(ranged_pings)
