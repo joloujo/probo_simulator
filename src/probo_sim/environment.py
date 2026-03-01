@@ -1,4 +1,4 @@
-from utils import Bounds
+from probo_sim.utils import Bounds
 
 class Environment:
     """

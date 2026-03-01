@@ -4,6 +4,8 @@
 #
 #    pip-compile
 #
+-e .
+    # via -r requirements.in
 contourpy==1.3.3
     # via matplotlib
 cycler==0.12.1
