@@ -4,7 +4,7 @@ from math import cos, sin, sqrt
 from random import gauss
 from typing import Generic, TypeVar
 
-from utils import Pose, Vector
+from probo_sim.utils import Pose, Vector
 
 State = TypeVar("State", bound=Pose) 
 Control = TypeVar("Control") 

@@ -2,8 +2,8 @@ from math import cos, sin
 import matplotlib.pyplot as plt
 from typing import Sequence
 
-from environment import Environment
-from utils import Bounds, Pose, Vector
+from probo_sim.environment import Environment
+from probo_sim.utils import Bounds, Pose, Vector
 
 class Visualizer:
     """

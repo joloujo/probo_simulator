@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from typing import Any, Collection, Generic, Sequence, TypeVar 
 
-from environment import Environment
-from robots import Robot
-from sensors import Sensor
-from utils import Pose
+from probo_sim.environment import Environment
+from probo_sim.robots import Robot
+from probo_sim.sensors import Sensor
+from probo_sim.utils import Pose
 
 
 # Results class modified from ChatGPT :)

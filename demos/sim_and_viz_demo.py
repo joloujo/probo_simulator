@@ -1,9 +1,9 @@
-from environment import Environment
-from robots import DifferentialDrive, DifferentialDriveState, DifferentialDriveControl, HolonomicDrive, HolonomicDriveState, HolonomicDriveControl
-from sensors import GPS, IMU, Encoder
-from simulator import Simulator, RobotControl, SensorState
-from utils import Bounds, Vector, Pose
-from visualizer import Visualizer
+from probo_sim.environment import Environment
+from probo_sim.robots import DifferentialDrive, DifferentialDriveState, DifferentialDriveControl, HolonomicDrive, HolonomicDriveState, HolonomicDriveControl
+from probo_sim.sensors import GPS, IMU, Encoder
+from probo_sim.simulator import Simulator, RobotControl, SensorState
+from probo_sim.utils import Bounds, Vector, Pose
+from probo_sim.visualizer import Visualizer
 
 DT = 0.1
 

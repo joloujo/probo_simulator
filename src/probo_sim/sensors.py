@@ -4,8 +4,8 @@ from math import sqrt
 from random import gauss
 from typing import Generic, Sequence, TypeVar
 
-from robots import Robot, DifferentialDrive, HolonomicDrive
-from utils import Pose, Vector
+from probo_sim.robots import Robot, DifferentialDrive, HolonomicDrive
+from probo_sim.utils import Pose, Vector
 
 State = TypeVar("State") 
 Measurement = TypeVar("Measurement")
