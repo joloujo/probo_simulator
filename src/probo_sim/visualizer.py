@@ -24,6 +24,12 @@ class Visualizer:
         """
         plt.show()
 
+    def legend(self, *args, **kwargs):
+        """
+        Show the plot
+        """
+        self.ax.legend(*args, **kwargs)
+
     def plot_environment(self, environment: Environment):
         """
         Display an environment on the plot
@@ -103,3 +109,15 @@ class Visualizer:
             vector: the vector to plot
         """
         self.ax.plot(vector.x, vector.y, **kwargs)
+
+    def plot_vectors(self, vectors: Sequence[Vector], **kwargs):
+        """
+        Display a vector on the plot
+
+        Params:
+            vector: the vector to plot
+        """
+
+        x, y = zip(*[(v.x, v.y) for v in vectors])
+
+        self.ax.plot(x, y, **kwargs)

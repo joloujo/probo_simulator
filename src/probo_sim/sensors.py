@@ -135,7 +135,7 @@ class PingerState:
 
 @dataclass
 class PingerMeasurement:
-    pings: Sequence[Vector]
+    pings: Sequence[Vector | None]
 
 class Pinger(Sensor[PingerState, PingerMeasurement]):
     def __init__(self, range: float, period: float, variance: tuple[float, float] = (0.0, 0.0)) -> None:
@@ -161,11 +161,13 @@ class Pinger(Sensor[PingerState, PingerMeasurement]):
             Vector.polar(
                 gauss(ping.r, sqrt(self.variance[0])),
                 gauss(ping.theta, sqrt(self.variance[1]))
-            ) for ping in measurement.pings
+            ) if ping is not None else None for ping in measurement.pings
         ]
 
         ranged_pings = [
-            ping for ping in noisy_pings if ping.r <= self.range
+            ping if ping is not None and ping.r <= self.range 
+            else None 
+            for ping in noisy_pings
         ]
 
         return PingerMeasurement(ranged_pings)

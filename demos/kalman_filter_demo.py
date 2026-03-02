@@ -98,9 +98,13 @@ poses = [
 
 # Visualize the results
 viz = Visualizer()
+
 viz.plot_environment(environment)
-viz.plot_poses([holo_start] + results[holo_ground_truth], alpha=0.5, color='green')
-viz.plot_poses([holo_start] + results[holo_gps], alpha=0.5, color='blue')
-viz.plot_poses([holo_start] + poses, alpha=0.5, color='red')
+
+viz.plot_poses([holo_start] + results[holo_ground_truth], alpha=0.5, color='green', label='Ground Truth')
+viz.plot_poses([holo_start] + results[holo_gps], alpha=0.5, color='blue', label='GPS Measurements')
+viz.plot_poses([holo_start] + poses, alpha=0.5, color='red', label='Filtered Poses')
+
+viz.legend(loc='upper right')
 
 viz.show()
