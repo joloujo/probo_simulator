@@ -35,11 +35,18 @@ class Vector:
         """
         return Vector(self.x - other.x, self.y - other.y)
     
-    def __mul__(self, other: int | float) -> 'Vector':
+    def __mul__(self, other: 'Vector | int | float') -> 'Vector':
         """
         Scale a vector
         """
+
+        if isinstance(other, Vector):
+            return Vector(self.x * other.x, self.y * other.y)
+
         return Vector(self.x * other, self.y * other)
+
+    def __rmul__(self, other: 'Vector | int | float') -> 'Vector':
+        return self.__mul__(other)
 
     @property
     def r(self) -> float:
@@ -56,6 +63,12 @@ class Vector:
         if self.x == 0.0 and self.y == 0.0:
             return 0.0
         return atan2(self.y, self.x)
+    
+    def rotate(self, rad: float):
+        return Vector(
+            cos(rad) * self.x - sin(rad) * self.y,
+            sin(rad) * self.x + cos(rad) * self.y
+        )
     
     def copy(self) -> 'Vector':
         """
@@ -85,6 +98,29 @@ class Pose:
         Copy the pose
         """
         return Pose(self.pos.copy(), self.theta)
+    
+    def __add__(self, other: 'Pose') -> 'Pose':
+        """
+        Subtract two vectors
+        """
+        return Pose(Vector(self.pos.x + other.pos.x, self.pos.y + other.pos.y), self.theta + other.theta)
+
+    def __sub__(self, other: 'Pose') -> 'Pose':
+        """
+        Subtract two vectors
+        """
+        return Pose(self.pos - other.pos, self.theta - other.theta)
+    
+    def __mul__(self, other: 'Pose | int | float') -> 'Pose':
+
+        if isinstance(other, Pose):
+            return Pose(self.pos * other.pos, self.theta * other.theta)
+
+        return Pose(self.pos * other, self.theta * other)
+    
+    def __rmul__(self, other: 'Pose | int | float') -> 'Pose':
+        return self.__mul__(other)
+    
 
 @dataclass
 class Bounds:
