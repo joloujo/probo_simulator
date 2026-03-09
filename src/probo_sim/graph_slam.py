@@ -1,10 +1,9 @@
-from abc import ABC, abstractmethod
-from math import cos, sin, sqrt, pi
+from abc import ABC
+from math import pi
 import sympy
-from typing import Any
-from pprint import pp
 
 from probo_sim.utils import Pose, Vector, Bounds
+from probo_sim.environment import Environment
 from probo_sim.visualizer import Visualizer
 
 class Factor[A, B](ABC):
@@ -117,6 +116,8 @@ class PingFactor(Factor[Pose, Vector]):
 # landmark2 = Vector(3, 1)
 # landmark3 = Vector(0, -1)
 
+prior = Pose(Vector(0, 0), 0)
+
 nodes: list[Pose | Vector] = [
     Pose(Vector(0, 0), 0),
     Pose(Vector(0, 0), 0),
@@ -141,7 +142,9 @@ factors: list[tuple[int, int, Pose | Vector]] = [
     (3, 6, Vector(-1, -2)),
 ]
 
-for i in range(100):
+last_error = float('inf')
+
+while True:
     gradient = [
         Pose(Vector(0, 0), 0),
         Pose(Vector(0, 0), 0),
@@ -152,28 +155,53 @@ for i in range(100):
         Vector(0, 0)
     ]
 
+    error = 0
+
     for a, b, factor in factors:
         if isinstance(factor, Pose):
+            error += OdomFactor(nodes[a], nodes[b], factor).squared_error # type: ignore
             delta1, delta2 = OdomFactor(nodes[a], nodes[b], factor).jacobian # type: ignore
             gradient[a] += delta1
             gradient[b] += delta2
         else: 
+            error += PingFactor(nodes[a], nodes[b], factor).squared_error # type: ignore
             delta1, delta2 = PingFactor(nodes[a], nodes[b], factor).jacobian # type: ignore
             gradient[a] += delta1
             gradient[b] += delta2
     
-    nodes = [node - 0.01 * g for node, g in zip(nodes, gradient)]
-    
+    print(error)
+
+    nodes = [node - 0.02 * g for node, g in zip(nodes, gradient)]
+
+    if last_error - error < 0.001:
+        break
+
+    last_error = error
+
+
+transform: Pose = prior - nodes[0] # type: ignore
+
+transformed_nodes: list[Pose | Vector] = []
+
+for node in nodes:
+    if isinstance(node, Pose):
+        transformed_nodes.append(Pose(
+            (node.pos + transform.pos).rotate(transform.theta),
+            node.theta + transform.theta
+        ))
+    else: 
+        transformed_nodes.append(
+            (node + transform.pos).rotate(transform.theta),
+        )
 
 viz = Visualizer()
 
+viz.plot_environment(Environment(Bounds(Vector(-1, -3), Vector(4, 2))))
 
-viz.plot_bounds(Bounds(Vector(-1, -3), Vector(4, 2)))
-
-for node in nodes:
-        if isinstance(node, Pose):
-            viz.plot_pose(node)
-        else: 
-            viz.plot_vector(node, marker='x')
+for node in transformed_nodes:
+    if isinstance(node, Pose):
+        viz.plot_pose(node)
+    else: 
+        viz.plot_vector(node, marker='x')
 
 viz.show()
