@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from math import cos, sin, sqrt
+from math import cos, sin, sqrt, pi
 import sympy
 from typing import Any
 from pprint import pp
@@ -109,35 +109,71 @@ class PingFactor(Factor[Pose, Vector]):
 
 
 
+# pose1 = Pose(Vector(0, 0), 0)
+# pose2 = Pose(Vector(1, 0), 0)
+# pose3 = Pose(Vector(2, -1), -pi/2)
+# pose4 = Pose(Vector(2, -2), -pi/2)
+# landmark1 = Vector(0, 1)
+# landmark2 = Vector(3, 1)
+# landmark3 = Vector(0, -1)
 
+nodes: list[Pose | Vector] = [
+    Pose(Vector(0, 0), 0),
+    Pose(Vector(0, 0), 0),
+    Pose(Vector(0, 0), 0),
+    Pose(Vector(0, 0), 0),
+    Vector(0, 0),
+    Vector(0, 0),
+    Vector(0, 0)
+]
 
+factors: list[tuple[int, int, Pose | Vector]] = [
+    (0, 1, Pose(Vector(1, 0), 0)),
+    (1, 2, Pose(Vector(1, -1), -pi/2)),
+    (2, 3, Pose(Vector(1, 0), 0)),
+    (0, 4, Vector(0, 1)),
+    (0, 6, Vector(0, -1)),
+    (1, 4, Vector(-1, 1)),
+    (1, 5, Vector(2, 1)),
+    (1, 6, Vector(-1, -1)),
+    (2, 5, Vector(-2, 1)),
+    (2, 6, Vector(0, -2)),
+    (3, 6, Vector(-1, -2)),
+]
 
-
-
-pose1 = Pose(Vector(0, 0), 0)
-pose2 = Pose(Vector(0, 0), 0)
-pose3 = Pose(Vector(0, 0), 0)
-pose4 = Pose(Vector(0, 0), 0)
-landmark1 = Vector(0, 0)
-landmark2 = Vector(0, 0)
-
-print(pose1, pose2)
 for i in range(100):
-    pose1delta1, pose2delta1 = OdomFactor(pose1, pose2, Pose(Vector(1, 0), 0)).jacobian
-    pose1delta2, landmark1delta1 = PingFactor(pose1, landmark1, Vector(0, 1)).jacobian
-    pose2delta2, landmark1delta2 = PingFactor(pose2, landmark1, Vector(-1, 1)).jacobian
+    gradient = [
+        Pose(Vector(0, 0), 0),
+        Pose(Vector(0, 0), 0),
+        Pose(Vector(0, 0), 0),
+        Pose(Vector(0, 0), 0),
+        Vector(0, 0),
+        Vector(0, 0),
+        Vector(0, 0)
+    ]
 
-    pose1 -= 0.01 * (pose1delta1 + pose1delta2)
-    pose2 -= 0.01 * (pose2delta1 + pose2delta2)
-    landmark1 -= 0.01 * (landmark1delta1 + landmark1delta2)
-
-    print(pose1, pose2, landmark1)
+    for a, b, factor in factors:
+        if isinstance(factor, Pose):
+            delta1, delta2 = OdomFactor(nodes[a], nodes[b], factor).jacobian # type: ignore
+            gradient[a] += delta1
+            gradient[b] += delta2
+        else: 
+            delta1, delta2 = PingFactor(nodes[a], nodes[b], factor).jacobian # type: ignore
+            gradient[a] += delta1
+            gradient[b] += delta2
+    
+    nodes = [node - 0.01 * g for node, g in zip(nodes, gradient)]
+    
 
 viz = Visualizer()
 
 
-viz.plot_bounds(Bounds(Vector(-1, -1), Vector(2, 2)))
-viz.plot_poses([pose1, pose2])
-viz.plot_vectors([landmark1], marker='x')
+viz.plot_bounds(Bounds(Vector(-1, -3), Vector(4, 2)))
+
+for node in nodes:
+        if isinstance(node, Pose):
+            viz.plot_pose(node)
+        else: 
+            viz.plot_vector(node, marker='x')
 
 viz.show()
