@@ -2,8 +2,11 @@ from abc import ABC
 from math import pi
 import sympy
 
-from probo_sim.utils import Pose, Vector, Bounds
 from probo_sim.environment import Environment
+from probo_sim.robots import DifferentialDrive, DifferentialDriveState, DifferentialDriveControl, HolonomicDrive, HolonomicDriveState, HolonomicDriveControl
+from probo_sim.sensors import GPS, Encoder, EncoderMeasurement, Pinger, PingerState
+from probo_sim.simulator import Simulator, RobotControl, SensorState
+from probo_sim.utils import Bounds, Vector, Pose
 from probo_sim.visualizer import Visualizer
 
 class Factor[A, B](ABC):
@@ -107,6 +110,66 @@ class PingFactor(Factor[Pose, Vector]):
         Vector(jacobian[3], jacobian[4]))
 
 
+DT = 0.5
+
+environment = Environment(
+    Bounds(Vector(0, 0), Vector(5, 5)),
+)
+
+diff_start = DifferentialDriveState(
+    Vector(1, 3)
+)
+diff_robot = DifferentialDrive(diff_start,
+    DifferentialDriveControl(0.05, 0.05)
+)
+diff_control: list[DifferentialDriveControl] = [
+    DifferentialDriveControl(1, 0) ] * 2 + [ # Go forward one unit
+    DifferentialDriveControl(pi/3, -pi/3)] * 3 + [ # Turn right 90 degrees
+    DifferentialDriveControl(1, 0)] * 2 # Go forward one unit
+
+
+diff_gt = GPS()
+diff_pinger = Pinger(3, 0, 
+    (0.01, 0.01)
+)
+
+gt_landmarks = [
+    Vector(1, 4),
+    Vector(4, 4),
+    Vector(1, 2)
+]
+
+sim = Simulator(
+    environment,
+    [
+        RobotControl(diff_robot, diff_control),
+    ],
+    [
+        SensorState(diff_gt, diff_robot),
+        SensorState(diff_pinger, PingerState(diff_robot, gt_landmarks)),
+    ],
+    DT
+)
+
+# Run the simulator
+results = sim.run()
+
+# print(results[diff_pinger])
+
+# viz = Visualizer()
+# viz.plot_environment(environment)
+
+# viz.plot_vectors(gt_landmarks, marker='*', ms=10, linestyle='None', color='black')
+
+# viz.plot_poses([diff_start] + results[diff_gt], color='red')
+
+# for pose, pingerMeasurement in zip(results[diff_gt], results[diff_pinger]):
+#     for ping in pingerMeasurement.pings:
+#         if ping is not None:
+#             viz.plot_vectors([pose.pos, ping.rotate(pose.theta) + pose.pos], alpha=0.5, color='blue')
+
+# viz.show()
+
 
 # pose1 = Pose(Vector(0, 0), 0)
 # pose2 = Pose(Vector(1, 0), 0)
@@ -116,44 +179,32 @@ class PingFactor(Factor[Pose, Vector]):
 # landmark2 = Vector(3, 1)
 # landmark3 = Vector(0, -1)
 
-prior = Pose(Vector(0, 0), 0)
+nodes: list[Pose | Vector] = \
+    [Pose(Vector(0, 0), 0) for i in range(len(diff_control) + 1)] + \
+    [Vector(0, 0) for i in range(len(gt_landmarks))]
 
-nodes: list[Pose | Vector] = [
-    Pose(Vector(0, 0), 0),
-    Pose(Vector(0, 0), 0),
-    Pose(Vector(0, 0), 0),
-    Pose(Vector(0, 0), 0),
-    Vector(0, 0),
-    Vector(0, 0),
-    Vector(0, 0)
-]
+factors: list[tuple[int, int, Pose | Vector]] = []
 
-factors: list[tuple[int, int, Pose | Vector]] = [
-    (0, 1, Pose(Vector(1, 0), 0)),
-    (1, 2, Pose(Vector(1, -1), -pi/2)),
-    (2, 3, Pose(Vector(1, 0), 0)),
-    (0, 4, Vector(0, 1)),
-    (0, 6, Vector(0, -1)),
-    (1, 4, Vector(-1, 1)),
-    (1, 5, Vector(2, 1)),
-    (1, 6, Vector(-1, -1)),
-    (2, 5, Vector(-2, 1)),
-    (2, 6, Vector(0, -2)),
-    (3, 6, Vector(-1, -2)),
-]
+last_state = diff_start
+
+for i, (control, pingerMeasurement) in enumerate(zip(diff_control, results[diff_pinger])):
+
+    next_state = DifferentialDrive.kinematics(last_state, control, DT)
+
+    delta_pose = Pose((next_state - last_state).pos.rotate(-last_state.theta), next_state.theta - last_state.theta)
+
+    factors.append((i, i+1, delta_pose))
+
+    for j, ping in enumerate(pingerMeasurement.pings):
+        if ping is not None:
+            factors.append((i+1, len(diff_control)+1+j, ping))
 
 last_error = float('inf')
 
 while True:
-    gradient = [
-        Pose(Vector(0, 0), 0),
-        Pose(Vector(0, 0), 0),
-        Pose(Vector(0, 0), 0),
-        Pose(Vector(0, 0), 0),
-        Vector(0, 0),
-        Vector(0, 0),
-        Vector(0, 0)
-    ]
+    gradient: list = \
+        [Pose(Vector(0, 0), 0) for i in range(len(diff_control)+1)] + \
+        [Vector(0, 0) for i in range(len(gt_landmarks))]
 
     error = 0
 
@@ -179,29 +230,33 @@ while True:
     last_error = error
 
 
-transform: Pose = prior - nodes[0] # type: ignore
+rotation = diff_start.theta - nodes[0].theta # type: ignore
+translation: Vector = diff_start.pos - nodes[0].pos.rotate(rotation) # type: ignore
 
 transformed_nodes: list[Pose | Vector] = []
 
 for node in nodes:
     if isinstance(node, Pose):
         transformed_nodes.append(Pose(
-            (node.pos + transform.pos).rotate(transform.theta),
-            node.theta + transform.theta
+            translation + node.pos.rotate(rotation),
+            node.theta + rotation
         ))
     else: 
         transformed_nodes.append(
-            (node + transform.pos).rotate(transform.theta),
+            translation + node.rotate(rotation),
         )
 
 viz = Visualizer()
 
-viz.plot_environment(Environment(Bounds(Vector(-1, -3), Vector(4, 2))))
+viz.plot_environment(environment)
+
+viz.plot_poses([diff_start] + results[diff_gt], color='red')
+viz.plot_vectors(gt_landmarks, linestyle='None', marker='*', ms=10, color='red')
 
 for node in transformed_nodes:
     if isinstance(node, Pose):
-        viz.plot_pose(node)
+        viz.plot_pose(node, color='blue')
     else: 
-        viz.plot_vector(node, marker='x')
+        viz.plot_vector(node, marker='*', ms=10, color='blue')
 
 viz.show()
