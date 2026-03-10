@@ -1,16 +1,16 @@
 from abc import ABC
 import numpy as np
 import sympy
-from typing import Any
-
-from probo_sim.utils import Pose, Vector
 
 class Factor(ABC):
-    def __init__(self, errors: list[Any], variables) -> None:
+    def __init__(self, errors: list, variables: sympy.Matrix, fim: np.ndarray) -> None:
+        self.fim = fim
+
         residuals = sympy.Matrix(errors)
         self._residuals = sympy.lambdify(variables, residuals)
 
-        cost = 0.5 * sum([error ** 2 for error in errors]) # type: ignore
+        # cost = sum([error ** 2 for error in errors]) # type: ignore
+        cost = residuals.T @ fim @ residuals
         self._cost = sympy.lambdify(variables, cost, "numpy")
 
         jacobian = residuals.jacobian(variables)
@@ -19,17 +19,17 @@ class Factor(ABC):
         hessian = sympy.hessian(cost, variables) 
         self._hessian = sympy.lambdify(variables, hessian, "numpy")
 
-        approximate_hessian = jacobian.T @ jacobian 
+        approximate_hessian = jacobian.T @ self.fim @ jacobian 
         self._approximate_hessian = sympy.lambdify(variables, approximate_hessian, "numpy")
 
     def residuals(self, state: np.ndarray) -> np.ndarray:
         return self._residuals(*state)[:, 0]
 
     def cost(self, state: np.ndarray) -> float:
-        return self._cost(*state)
+        return self._cost(*state)[0, 0]
     
     def gradient(self, state: np.ndarray) -> np.ndarray:
-        return (self.jacobian(state).T @ self.residuals(state)).T
+        return (self.jacobian(state).T @ self.fim @ self.residuals(state)).T
     
     def jacobian(self, state: np.ndarray) -> np.ndarray:
         return self._jacobian(*state)
@@ -41,28 +41,28 @@ class Factor(ABC):
         return self._approximate_hessian(*state)
 
 class OdomFactor(Factor):
-    def __init__(self, measurement: np.ndarray) -> None:
+    def __init__(self, measurement: np.ndarray, covariance: np.ndarray = np.identity(3)) -> None:
         x_a, y_a, t_a, x_b, y_b, t_b = sympy.symbols('x_a, y_a, t_a, x_b, y_b, t_b')
         variables = sympy.Matrix([x_a, y_a, t_a, x_b, y_b, t_b])
 
         error_x = sympy.cos(t_a) * (x_b - x_a) + sympy.sin(t_a) * (y_b - y_a) - measurement[0]
         error_y = -1 * sympy.sin(t_a) * (x_b - x_a) + sympy.cos(t_a) * (y_b - y_a) - measurement[1] # type: ignore
-        error_theta = sympy.atan2(sympy.sin(t_b - t_a - - measurement[2]), sympy.cos(t_b - t_a - - measurement[2]))
+        error_theta = sympy.atan2(sympy.sin(t_b - t_a - measurement[2]), sympy.cos(t_b - t_a - measurement[2]))
 
-        super().__init__([error_x, error_y, error_theta], variables)
+        super().__init__([error_x, error_y, error_theta], variables, np.linalg.inv(covariance))
         
 class PingFactor(Factor):
-    def __init__(self, measurement: np.ndarray) -> None:
+    def __init__(self, measurement: np.ndarray, covariance: np.ndarray = np.identity(2)) -> None:
         x_a, y_a, t_a, x_b, y_b = sympy.symbols('x_a, y_a, t_a, x_b, y_b')
         variables = sympy.Matrix([x_a, y_a, t_a, x_b, y_b])
 
         error_x = sympy.cos(t_a) * (x_b - x_a) + sympy.sin(t_a) * (y_b - y_a) - measurement[0]
         error_y = -1 * sympy.sin(t_a) * (x_b - x_a) + sympy.cos(t_a) * (y_b - y_a) - measurement[1] # type: ignore
 
-        super().__init__([error_x, error_y], variables)
+        super().__init__([error_x, error_y], variables, np.linalg.inv(covariance))
 
 class PriorFactor(Factor):
-    def __init__(self, prior: np.ndarray, weight: float = 100) -> None:
+    def __init__(self, prior: np.ndarray, weight: float = 100, covariance: np.ndarray = np.identity(3)) -> None:
         x, y, t = sympy.symbols('x, y, t')
         variables = sympy.Matrix([x, y, t])
 
@@ -70,7 +70,7 @@ class PriorFactor(Factor):
         error_y = (y - prior[1]) * weight
         error_t = (t - prior[2]) * weight
 
-        super().__init__([error_x, error_y, error_t], variables)
+        super().__init__([error_x, error_y, error_t], variables, np.linalg.inv(covariance))
 
 
 class GraphSLAM():
@@ -109,15 +109,3 @@ class GraphSLAM():
             factor.cost(self.state[indexes])
             for indexes, factor in self.factors
         ])
-
-
-# gs = GraphSLAM(8)
-
-# gs.add_factor([0, 1, 2, 3, 4, 5], OdomFactor(np.array([1, 0, 0])))
-# gs.add_factor([0, 1, 2, 6, 7], PingFactor(np.array([0, 1])))
-# gs.add_factor([3, 4, 5, 6, 7], PingFactor(np.array([-1, 1])))
-
-# for i in range(10):
-#     gs.gradient_descent_step(0.5)
-
-# print(gs.state)

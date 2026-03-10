@@ -9,7 +9,7 @@ from probo_sim.simulator import Simulator, RobotControl, SensorState
 from probo_sim.utils import Bounds, Vector, Pose
 from probo_sim.visualizer import Visualizer
 
-DT = 0.1
+DT = 0.5
 
 environment = Environment(
     Bounds(Vector(0, 0), Vector(5, 5)),
@@ -64,7 +64,7 @@ gs.add_factor([0, 1, 2], PriorFactor(np.array([diff_start.pos.x, diff_start.pos.
 for i, control in enumerate(diff_control):
     indexes = list(range(i*3, (i+2)*3))
     delta = DifferentialDrive.kinematics(DifferentialDriveState(), control, DT)
-    factor = OdomFactor(np.array([delta.pos.x, delta.pos.y, delta.theta]))
+    factor = OdomFactor(np.array([delta.pos.x, delta.pos.y, delta.theta]), np.diag([0.01, 0.01, 0.01])) # This covariance isn't technically correct
 
     gs.add_factor(indexes, factor)
 
@@ -73,7 +73,7 @@ for i, pingerMeasurement in enumerate(results[diff_pinger]):
         if ping is None: continue
 
         indexes = list(range((i+1)*3, (i+2)*3)) + list(range(n_poses + j*2, n_poses + (j+1)*2))
-        factor = PingFactor(np.array([ping.x, ping.y]))
+        factor = PingFactor(np.array([ping.x, ping.y]), np.diag([0.001, 0.001]))
 
         gs.add_factor(indexes, factor)
 
@@ -85,7 +85,9 @@ while True:
     # error = gs.gradient_descent_step(0.01)
     error = gs.gauss_newton_step()
 
-    if last_error - error < 0.00001 or error == 0:
+    print(error)
+
+    if last_error - error < 1e-6:
         break
 
     last_error = error
