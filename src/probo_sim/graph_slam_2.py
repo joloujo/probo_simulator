@@ -61,6 +61,17 @@ class PingFactor(Factor):
 
         super().__init__([error_x, error_y], variables)
 
+class PriorFactor(Factor):
+    def __init__(self, prior: np.ndarray, weight: float = 100) -> None:
+        x, y, t = sympy.symbols('x, y, t')
+        variables = sympy.Matrix([x, y, t])
+
+        error_x = (x - prior[0]) * weight
+        error_y = (y - prior[1]) * weight
+        error_t = (t - prior[2]) * weight
+
+        super().__init__([error_x, error_y, error_t], variables)
+
 
 class GraphSLAM():
     def __init__(self, n: int) -> None:
@@ -78,6 +89,21 @@ class GraphSLAM():
             gradient[indexes] += factor.gradient(self.state[indexes])
 
         self.state -= gradient * alpha
+
+        return sum([
+            factor.cost(self.state[indexes])
+            for indexes, factor in self.factors
+        ])
+
+    def gauss_newton_step(self) -> float:
+        gradient = np.zeros(self.n)
+        hessian = np.zeros((self.n, self.n))
+
+        for indexes, factor in self.factors:
+            gradient[indexes] += factor.gradient(self.state[indexes])
+            hessian[np.ix_(indexes, indexes)] += factor.approximate_hessian(self.state[indexes])
+
+        self.state += np.linalg.solve(hessian, -gradient)
 
         return sum([
             factor.cost(self.state[indexes])
