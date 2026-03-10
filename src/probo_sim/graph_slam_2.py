@@ -5,10 +5,13 @@ from typing import Any
 
 class Factor(ABC):
     def __init__(self, errors: list[Any], variables) -> None:
+        residuals = sympy.Matrix(errors)
+        self._residuals = sympy.lambdify(variables, residuals)
+
         cost = 0.5 * sum([error ** 2 for error in errors]) # type: ignore
         self._cost = sympy.lambdify(variables, cost, "numpy")
 
-        jacobian = sympy.Matrix(errors).jacobian(variables)
+        jacobian = residuals.jacobian(variables)
         self._jacobian = sympy.lambdify(variables, jacobian, "numpy")
 
         hessian = sympy.hessian(cost, variables) 
@@ -16,6 +19,9 @@ class Factor(ABC):
 
         approximate_hessian = jacobian.T @ jacobian 
         self._approximate_hessian = sympy.lambdify(variables, approximate_hessian, "numpy")
+
+    def residuals(self, state: np.ndarray) -> np.ndarray:
+        return self._residuals(*state)
 
     def cost(self, state: np.ndarray) -> float:
         return self._cost(*state)
@@ -70,6 +76,7 @@ o_state = np.array([0, 0, 0, 0.9, 0, 0])
 
 print(o.cost(o_state))
 print(o.jacobian(o_state))
+print(o.jacobian(o_state) * o.residuals(o_state))
 print(o.hessian(o_state))
 print(o.hessian(o_state) - o.approximate_hessian(o_state))
 
@@ -82,6 +89,7 @@ p_state = np.array([0, 0, 0, 1.1, 0.9])
 
 print(p.cost(p_state))
 print(p.jacobian(p_state))
+print(p.jacobian(p_state) * p.residuals(p_state))
 print(p.hessian(p_state))
 print(p.hessian(p_state) - p.approximate_hessian(p_state))
 
