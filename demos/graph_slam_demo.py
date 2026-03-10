@@ -2,7 +2,7 @@ from math import pi
 import numpy as np
 
 from probo_sim.environment import Environment
-from probo_sim.graph_slam_2 import GraphSLAM, OdomFactor, PingFactor, PriorFactor
+from probo_sim.graph_slam import GraphSLAM, OdomFactor, PingFactor, PriorFactor
 from probo_sim.robots import DifferentialDrive, DifferentialDriveState, DifferentialDriveControl
 from probo_sim.sensors import GPS, Pinger, PingerState
 from probo_sim.simulator import Simulator, RobotControl, SensorState
