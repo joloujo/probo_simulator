@@ -3,6 +3,8 @@ import numpy as np
 import sympy
 from typing import Any
 
+from probo_sim.utils import Pose, Vector
+
 class Factor(ABC):
     def __init__(self, errors: list[Any], variables) -> None:
         residuals = sympy.Matrix(errors)
@@ -21,10 +23,13 @@ class Factor(ABC):
         self._approximate_hessian = sympy.lambdify(variables, approximate_hessian, "numpy")
 
     def residuals(self, state: np.ndarray) -> np.ndarray:
-        return self._residuals(*state)
+        return self._residuals(*state)[:, 0]
 
     def cost(self, state: np.ndarray) -> float:
         return self._cost(*state)
+    
+    def gradient(self, state: np.ndarray) -> np.ndarray:
+        return (self.jacobian(state).T @ self.residuals(state)).T
     
     def jacobian(self, state: np.ndarray) -> np.ndarray:
         return self._jacobian(*state)
@@ -57,43 +62,36 @@ class PingFactor(Factor):
         super().__init__([error_x, error_y], variables)
 
 
-# T = TypeVar("T", bound=tuple[Factor, ...])
+class GraphSLAM():
+    def __init__(self, n: int) -> None:
+        self.n = n
+        self.state = np.zeros(n)
+        self.factors: list[tuple[list[int], Factor]] = []
 
-# class GraphSLAM[T]():
-#     def __init__(self, nodes: T) -> None:
-#         self.nodes = nodes
+    def add_factor(self, indexes: list[int], factor: Factor):
+        self.factors.append((indexes, factor))
 
-#         self.state
+    def gradient_descent_step(self, alpha: float) -> float:
+        gradient = np.zeros(self.n)
 
+        for indexes, factor in self.factors:
+            gradient[indexes] += factor.gradient(self.state[indexes])
 
+        self.state -= gradient * alpha
 
-
-o = OdomFactor(
-    np.array([1, 0, 0])
-)
-
-o_state = np.array([0, 0, 0, 0.9, 0, 0])
-
-print(o.cost(o_state))
-print(o.jacobian(o_state))
-print(o.jacobian(o_state) * o.residuals(o_state))
-print(o.hessian(o_state))
-print(o.hessian(o_state) - o.approximate_hessian(o_state))
-
-
-p = PingFactor(
-    np.array([1, 1])
-)
-
-p_state = np.array([0, 0, 0, 1.1, 0.9])
-
-print(p.cost(p_state))
-print(p.jacobian(p_state))
-print(p.jacobian(p_state) * p.residuals(p_state))
-print(p.hessian(p_state))
-print(p.hessian(p_state) - p.approximate_hessian(p_state))
+        return sum([
+            factor.cost(self.state[indexes])
+            for indexes, factor in self.factors
+        ])
 
 
+# gs = GraphSLAM(8)
 
+# gs.add_factor([0, 1, 2, 3, 4, 5], OdomFactor(np.array([1, 0, 0])))
+# gs.add_factor([0, 1, 2, 6, 7], PingFactor(np.array([0, 1])))
+# gs.add_factor([3, 4, 5, 6, 7], PingFactor(np.array([-1, 1])))
 
+# for i in range(10):
+#     gs.gradient_descent_step(0.5)
 
+# print(gs.state)
