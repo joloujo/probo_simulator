@@ -1,5 +1,7 @@
 -e .
+lark
 matplotlib
 numpy
 pytest
 sympy
+PyYAML

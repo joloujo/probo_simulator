@@ -3,74 +3,103 @@ import numpy as np
 import sympy
 
 class Factor(ABC):
-    def __init__(self, errors: list, variables: sympy.Matrix, fim: np.ndarray) -> None:
-        self.fim = fim
 
-        residuals = sympy.Matrix(errors)
-        self._residuals = sympy.lambdify(variables, residuals)
+    _state_variables: sympy.Matrix
+    _measurement_variables: sympy.Matrix
+    _error_functions: sympy.Matrix
 
-        # cost = sum([error ** 2 for error in errors]) # type: ignore
-        cost = residuals.T @ fim @ residuals
-        self._cost = sympy.lambdify(variables, cost, "numpy")
+    measurement: np.ndarray
+    fim: np.ndarray
 
-        jacobian = residuals.jacobian(variables)
-        self._jacobian = sympy.lambdify(variables, jacobian, "numpy")
+    def __init__(self) -> None:
+        residuals = sympy.Matrix(self._error_functions)
+        self._residuals = sympy.lambdify((self._state_variables, self._measurement_variables), residuals)
 
-        hessian = sympy.hessian(cost, variables) 
-        self._hessian = sympy.lambdify(variables, hessian, "numpy")
+        cost = residuals.T @ self.fim @ residuals
+        self._cost = sympy.lambdify((self._state_variables, self._measurement_variables), cost, "numpy")
+
+        jacobian = residuals.jacobian(self._state_variables)
+        self._jacobian = sympy.lambdify((self._state_variables, self._measurement_variables), jacobian, "numpy")
+
+        hessian = sympy.hessian(cost, self._state_variables) 
+        self._hessian = sympy.lambdify((self._state_variables, self._measurement_variables), hessian, "numpy")
 
         approximate_hessian = jacobian.T @ self.fim @ jacobian 
-        self._approximate_hessian = sympy.lambdify(variables, approximate_hessian, "numpy")
+        self._approximate_hessian = sympy.lambdify((self._state_variables, self._measurement_variables), approximate_hessian, "numpy")
 
     def residuals(self, state: np.ndarray) -> np.ndarray:
-        return self._residuals(*state)[:, 0]
+        return self._residuals(state, self.measurement)[:, 0]
 
     def cost(self, state: np.ndarray) -> float:
-        return self._cost(*state)[0, 0]
+        return self._cost(state, self.measurement)[0, 0]
     
     def gradient(self, state: np.ndarray) -> np.ndarray:
         return (self.jacobian(state).T @ self.fim @ self.residuals(state)).T
     
     def jacobian(self, state: np.ndarray) -> np.ndarray:
-        return self._jacobian(*state)
+        return self._jacobian(state, self.measurement)
     
     def hessian(self, state: np.ndarray) -> np.ndarray:
-        return self._hessian(*state)
+        return self._hessian(state, self.measurement)
     
     def approximate_hessian(self, state: np.ndarray) -> np.ndarray:
-        return self._approximate_hessian(*state)
+        return self._approximate_hessian(state, self.measurement)
 
 class OdomFactor(Factor):
+
+    x_a, y_a, t_a, x_b, y_b, t_b = sympy.symbols('x_a, y_a, t_a, x_b, y_b, t_b')
+    _state_variables = sympy.Matrix([x_a, y_a, t_a, x_b, y_b, t_b])
+    
+    x_m, y_m, t_m = sympy.symbols('x_m, y_m, t_m')
+    _measurement_variables = sympy.Matrix([x_m, y_m, t_m])
+
+    error_x = sympy.cos(t_a) * (x_b - x_a) + sympy.sin(t_a) * (y_b - y_a) - x_m
+    error_y = -1 * sympy.sin(t_a) * (x_b - x_a) + sympy.cos(t_a) * (y_b - y_a) - y_m # type: ignore
+    error_theta = sympy.atan2(sympy.sin(t_b - t_a - t_m), sympy.cos(t_b - t_a - t_m))
+    _error_functions = sympy.Matrix([error_x, error_y, error_theta])
+
     def __init__(self, measurement: np.ndarray, covariance: np.ndarray = np.identity(3)) -> None:
-        x_a, y_a, t_a, x_b, y_b, t_b = sympy.symbols('x_a, y_a, t_a, x_b, y_b, t_b')
-        variables = sympy.Matrix([x_a, y_a, t_a, x_b, y_b, t_b])
-
-        error_x = sympy.cos(t_a) * (x_b - x_a) + sympy.sin(t_a) * (y_b - y_a) - measurement[0]
-        error_y = -1 * sympy.sin(t_a) * (x_b - x_a) + sympy.cos(t_a) * (y_b - y_a) - measurement[1] # type: ignore
-        error_theta = sympy.atan2(sympy.sin(t_b - t_a - measurement[2]), sympy.cos(t_b - t_a - measurement[2]))
-
-        super().__init__([error_x, error_y, error_theta], variables, np.linalg.inv(covariance))
+        self.measurement = measurement
+        self.fim = np.linalg.inv(covariance)
+        
+        super().__init__()
         
 class PingFactor(Factor):
+
+    x_a, y_a, t_a, x_b, y_b = sympy.symbols('x_a, y_a, t_a, x_b, y_b')
+    _state_variables = sympy.Matrix([x_a, y_a, t_a, x_b, y_b])
+
+    x_m, y_m = sympy.symbols('x_m, y_m')
+    _measurement_variables = sympy.Matrix([x_m, y_m])
+
+    error_x = sympy.cos(t_a) * (x_b - x_a) + sympy.sin(t_a) * (y_b - y_a) - x_m
+    error_y = -1 * sympy.sin(t_a) * (x_b - x_a) + sympy.cos(t_a) * (y_b - y_a) - y_m # type: ignore
+    _error_functions = sympy.Matrix([error_x, error_y])
+
     def __init__(self, measurement: np.ndarray, covariance: np.ndarray = np.identity(2)) -> None:
-        x_a, y_a, t_a, x_b, y_b = sympy.symbols('x_a, y_a, t_a, x_b, y_b')
-        variables = sympy.Matrix([x_a, y_a, t_a, x_b, y_b])
+        self.measurement = measurement
+        self.fim = np.linalg.inv(covariance)
 
-        error_x = sympy.cos(t_a) * (x_b - x_a) + sympy.sin(t_a) * (y_b - y_a) - measurement[0]
-        error_y = -1 * sympy.sin(t_a) * (x_b - x_a) + sympy.cos(t_a) * (y_b - y_a) - measurement[1] # type: ignore
-
-        super().__init__([error_x, error_y], variables, np.linalg.inv(covariance))
+        super().__init__()
 
 class PriorFactor(Factor):
-    def __init__(self, prior: np.ndarray, weight: float = 100, covariance: np.ndarray = np.identity(3)) -> None:
-        x, y, t = sympy.symbols('x, y, t')
-        variables = sympy.Matrix([x, y, t])
 
-        error_x = (x - prior[0]) * weight
-        error_y = (y - prior[1]) * weight
-        error_t = (t - prior[2]) * weight
+    x, y, t = sympy.symbols('x, y, t')
+    _state_variables = sympy.Matrix([x, y, t])
 
-        super().__init__([error_x, error_y, error_t], variables, np.linalg.inv(covariance))
+    x_m, y_m, t_m = sympy.symbols('x_m, y_m, t_m')
+    _measurement_variables = sympy.Matrix([x_m, y_m, t_m])
+
+    error_x = (x - x_m)
+    error_y = (y - y_m)
+    error_t = (t - t_m)
+    _error_functions = sympy.Matrix([error_x, error_y, error_t])
+
+    def __init__(self, measurement: np.ndarray, covariance: np.ndarray = np.identity(3)) -> None:
+        self.measurement = measurement
+        self.fim = np.linalg.inv(covariance)
+    
+        super().__init__()
 
 
 class GraphSLAM():
