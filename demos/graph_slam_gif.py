@@ -19,7 +19,7 @@ environment = Environment(
 
 diff_start = DifferentialDriveState(Vector(1, 3))
 diff_robot = DifferentialDrive(diff_start,
-    # DifferentialDriveControl(0.01, 0.01)
+    DifferentialDriveControl(0.01, 0.01)
 )
 diff_control: list[DifferentialDriveControl] = [
     DifferentialDriveControl(1, 0) ] * round(1/DT) + [ # Go forward one unit
@@ -28,13 +28,13 @@ diff_control: list[DifferentialDriveControl] = [
 
 diff_gt = GPS()
 diff_pinger = Pinger(3, 0, 
-    # (0.001, 0.001)
+    (0.001, 0.001)
 )
 
 gt_landmarks = [
     Vector(1, 4),
-    Vector(4, 4),
     Vector(1, 2),
+    Vector(4, 4),
     Vector(4, 1),
 ]
 
@@ -56,7 +56,14 @@ results = sim.run()
 
 gs = GraphSLAM(3)
 
-n_landmarks = 0
+gs.add_factor([0, 1, 2], PriorFactor(np.array([diff_start.pos.x, diff_start.pos.y, diff_start.theta])))
+
+landmark_map: list[int | None] = [None] * len(gt_landmarks)
+# landmark_map: list[int | None] = [None, None, None, None]
+
+def n_landmarks() -> int:
+    return len(landmark_map) - landmark_map.count(None)
+
 n_poses = 1
 
 def plot():
@@ -67,14 +74,14 @@ def plot():
 
     gs_landmarks: list[Vector] = []
 
-    for i in range(n_landmarks):
+    for i in range(n_landmarks()):
         start = 2*i
         gs_landmarks.append(Vector(gs.state[start], gs.state[start+1]))
 
     gs_poses: list[Pose] = []
 
     for i in range(n_poses):
-        start = 2*n_landmarks + 3*i
+        start = 2*n_landmarks() + 3*i
         gs_poses.append(Pose(Vector(gs.state[start], gs.state[start+1]), gs.state[start+2]))
 
 
@@ -87,86 +94,54 @@ def plot():
 
     viz.show()
 
-gs.add_factor([0, 1, 2], PriorFactor(np.array([diff_start.pos.x, diff_start.pos.y, diff_start.theta])))
-
 gs.optimize()
-
 plot()
 
-gs.n += 7
-n_landmarks = 2
-n_poses = 2
-gs.reset_state()
-
-gs.factors = [([n + 4 for n in factor[0]], factor[1]) for factor in gs.factors]
-
-gs.add_factor([4, 5, 6, 7, 8, 9], OdomFactor(np.array([0.5, 0, 0])))
-gs.add_factor([7, 8, 9, 0, 1], PingFactor(np.array([-0.5, 1])))
-gs.add_factor([7, 8, 9, 2, 3], PingFactor(np.array([-0.5, -1])))
-
-gs.optimize()
-
-plot()
-
-exit()
-
-n_poses = (1 + len(diff_control)) * 3
-
-graph_slam_n = n_poses + len(gt_landmarks) * 2
-
-
-for i, control in enumerate(diff_control):
-    indexes = list(range(i*3, (i+2)*3))
-    delta = DifferentialDrive.kinematics(DifferentialDriveState(), control, DT)
-    factor = OdomFactor(np.array([delta.pos.x, delta.pos.y, delta.theta])) 
-
-    gs.add_factor(indexes, factor)
-
-for i, pingerMeasurement in enumerate(results[diff_pinger]):
+for i, (control, pingerMeasurement) in enumerate(zip(diff_control, results[diff_pinger])):
     for j, ping in enumerate(pingerMeasurement.pings):
         if ping is None: continue
 
-        indexes = list(range((i+1)*3, (i+2)*3)) + list(range(n_poses + j*2, n_poses + (j+1)*2))
-        factor = PingFactor(np.array([ping.x, ping.y]))
+        if landmark_map[j] is None:
+            print(f'Adding landmark {j}')
 
-        gs.add_factor(indexes, factor)
 
-print('Optimizing')
+            gs.factors = [
+                ([n + 2 if n >= n_landmarks() * 2 else n for n in factor[0]], factor[1]) 
+                for factor in gs.factors
+            ]
 
-last_error = float('inf')
+            landmark_map[j] = n_landmarks()
+            gs.n += 2
 
-while True:
-    error = gs.gauss_newton_step()
+        pose_start = n_landmarks() * 2 + (i + 1) * 3
+        landmark_start: int = landmark_map[j] * 2 # type: ignore
 
-    print(error)
+        gs.add_factor(
+            [pose_start, pose_start + 1, pose_start + 2] + [landmark_start, landmark_start + 1],
+            PingFactor(np.array([ping.x, ping.y]))
+        )
 
-    if last_error - error < 1e-6:
-        break
+        for f in gs.factors:
+            print(f)
 
-    last_error = error
+    last_pose_start = n_landmarks() * 2 + i * 3
+    delta = DifferentialDrive.kinematics(DifferentialDriveState(), control, DT)
 
-print(f'Done with error {last_error}')
+    gs.n += 3
+    n_poses += 1
 
-gs_poses: list[Pose] = []
+    gs.add_factor(
+        list(range(last_pose_start, last_pose_start+6)), 
+        OdomFactor(np.array([delta.pos.x, delta.pos.y, delta.theta]))
+    )
 
-for n in range(len(diff_control) + 1):
-    i = n*3
-    gs_poses.append(Pose(Vector(gs.state[i], gs.state[i+1]), gs.state[i+2]))
+    gs.reset_state()
 
-gs_landmarks: list[Vector] = []
+    print(landmark_map)
+    print(gs.state)
 
-for n in range(len(gt_landmarks)):
-    i = n_poses + n*2
-    gs_landmarks.append(Vector(gs.state[i], gs.state[i+1]))
+    for f in gs.factors:
+        print(f)
 
-viz = Visualizer()
-
-viz.plot_environment(environment)
-
-viz.plot_poses([diff_start] + results[diff_gt], color='red')
-viz.plot_vectors(gt_landmarks, linestyle='None', marker='*', ms=10, color='red')
-
-viz.plot_poses(gs_poses, color='blue')
-viz.plot_vectors(gs_landmarks, linestyle='None', marker='*', ms=10, color='blue')
-
-viz.show()
+    gs.optimize()
+    plot()
