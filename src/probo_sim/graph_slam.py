@@ -108,6 +108,9 @@ class GraphSLAM():
         self.state = np.zeros(n)
         self.factors: list[tuple[list[int], Factor]] = []
 
+    def reset_state(self) -> None:
+        self.state = np.zeros(self.n)
+
     def add_factor(self, indexes: list[int], factor: Factor):
         self.factors.append((indexes, factor))
 
@@ -138,3 +141,16 @@ class GraphSLAM():
             factor.cost(self.state[indexes])
             for indexes, factor in self.factors
         ])
+
+    def optimize(self, threshold: float = 1e-9) -> float:
+        last_error = float('inf')
+
+        while True:
+            error = self.gauss_newton_step()
+
+            if last_error - error < threshold:
+                break
+
+            last_error = error
+
+        return last_error
