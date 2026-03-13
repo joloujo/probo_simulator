@@ -13,6 +13,9 @@ DT = 0.5
 
 environment = Environment(
     Bounds(Vector(0, 0), Vector(5, 5)),
+    [
+        Bounds(Vector(0, 0), Vector(2, 1)),
+    ]
 )
 
 diff_start = DifferentialDriveState(Vector(1, 3))

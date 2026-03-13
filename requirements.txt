@@ -12,6 +12,8 @@ cycler==0.12.1
     # via matplotlib
 fonttools==4.61.1
     # via matplotlib
+imageio==2.37.3
+    # via -r requirements.in
 iniconfig==2.3.0
     # via pytest
 kiwisolver==1.4.9
@@ -26,13 +28,16 @@ numpy==2.4.2
     # via
     #   -r requirements.in
     #   contourpy
+    #   imageio
     #   matplotlib
 packaging==26.0
     # via
     #   matplotlib
     #   pytest
 pillow==12.1.1
-    # via matplotlib
+    # via
+    #   imageio
+    #   matplotlib
 pluggy==1.6.0
     # via pytest
 pygments==2.19.2

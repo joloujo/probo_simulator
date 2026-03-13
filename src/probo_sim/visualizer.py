@@ -24,6 +24,12 @@ class Visualizer:
         """
         plt.show()
 
+    def save(self, filename: str):
+        plt.savefig(filename)
+
+    def close(self):
+        plt.close(self.fig)
+
     def legend(self, *args, **kwargs):
         """
         Show the plot
