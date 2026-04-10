@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from math import sqrt
 from random import gauss
 from typing import Generic, Sequence, TypeVar
 
 from probo_sim.robots import Robot, DifferentialDrive, HolonomicDrive
-from probo_sim.utils import Pose, Vector
+from probo_sim.utils import Pose, Vector, Field
 
 State = TypeVar("State") 
 Measurement = TypeVar("Measurement")
@@ -171,3 +171,22 @@ class Pinger(Sensor[PingerState, PingerMeasurement]):
         ]
 
         return PingerMeasurement(ranged_pings)
+
+
+@dataclass
+class InsituInstrumentState:
+    robot: Robot
+    field: Field
+
+class InsituInstrument(Sensor[InsituInstrumentState, float]):
+    def __init__(self, period: float, variance: float = 0.0) -> None:
+        super().__init__(period)
+        self.variance = variance
+
+    def ground_truth(self, state: InsituInstrumentState) -> float:
+        return state.field(state.robot.state.pos)
+    
+    def noisify(self, measurement: float) -> float:
+        noisy = gauss(measurement, sqrt(self.variance))
+
+        return noisy if noisy > 0.0 else 0.0

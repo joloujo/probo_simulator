@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
-from math import atan2, cos, sin, hypot
+from math import atan2, cos, sin, hypot, exp
+import numpy as np
+from typing import Callable
 
 @dataclass
 class Vector:
@@ -137,3 +139,11 @@ class Bounds:
         Return if a location is inside the bounds
         """
         return self.min.x <= vec.x <= self.max.x and self.min.y <= vec.y <= self.max.y
+
+Field = Callable[[Vector], float]
+
+def gaussian[T: (int, float, np.ndarray)](point: T, height: int | float, center: T, width: T) -> float:
+    
+    distance = np.sum(np.pow(point - center, 2) / (2 * np.pow(width, 2)))
+    
+    return height * exp(-1 * distance)
