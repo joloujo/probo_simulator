@@ -5,7 +5,7 @@ from probo_sim.environment import Environment
 from probo_sim.graph_slam import GraphSLAM, OdomFactor, PingFactor, PriorFactor
 from probo_sim.robots import DifferentialDrive, DifferentialDriveState, DifferentialDriveControl
 from probo_sim.sensors import GPS, Pinger, PingerState
-from probo_sim.simulator import Simulator, RobotControl, SensorState
+from probo_sim.simulator import Simulator, RobotControl, SensorState, open_loop
 from probo_sim.utils import Bounds, Vector, Pose
 from probo_sim.visualizer import Visualizer
 
@@ -42,7 +42,7 @@ gt_landmarks = [
 sim = Simulator(
     environment,
     [
-        RobotControl(diff_robot, diff_control),
+        RobotControl(diff_robot, open_loop(diff_control)),
     ],
     [
         SensorState(diff_gt, diff_robot),

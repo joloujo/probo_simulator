@@ -4,7 +4,7 @@ from probo_sim.environment import Environment
 from probo_sim.kalman_filter import KalmanFilter
 from probo_sim.robots import HolonomicDrive, HolonomicDriveState, HolonomicDriveControl
 from probo_sim.sensors import GPS
-from probo_sim.simulator import Simulator, RobotControl, SensorState
+from probo_sim.simulator import Simulator, RobotControl, SensorState, open_loop
 from probo_sim.utils import Bounds, Vector, Pose
 from probo_sim.visualizer import Visualizer
 
@@ -43,7 +43,7 @@ holo_gps = GPS(
 sim = Simulator(
     environment,
     [
-        RobotControl(holo_robot, holo_control),
+        RobotControl(holo_robot, open_loop(holo_control)),
     ],
     [
         SensorState(holo_ground_truth, holo_robot),
@@ -76,7 +76,7 @@ initial_P = np.zeros((3, 3))
 
 kalman_filter_controls = [
     np.array([control.xv, control.yv, control.w])
-    for control in holo_control
+    for control in results[holo_robot]
 ]
 
 kalman_filter_measurements = [

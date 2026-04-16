@@ -6,7 +6,7 @@ from sklearn.gaussian_process.kernels import RBF
 from probo_sim.environment import Environment
 from probo_sim.robots import DifferentialDrive, DifferentialDriveState, DifferentialDriveControl
 from probo_sim.sensors import GPS, InsituInstrument, InsituInstrumentState
-from probo_sim.simulator import Simulator, RobotControl, SensorState
+from probo_sim.simulator import Simulator, RobotControl, SensorState, open_loop
 from probo_sim.utils import Bounds, Vector, gaussian
 from probo_sim.visualizer import Visualizer
 
@@ -56,7 +56,7 @@ field_sensor = InsituInstrument(SENSOR_PERIOD, VARIANCE)
 sim = Simulator(
     environment,
     [
-        RobotControl(robot, control),
+        RobotControl(robot, open_loop(control)),
     ],
     [
         SensorState(gps, robot),

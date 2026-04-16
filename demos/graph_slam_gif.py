@@ -2,13 +2,12 @@ import imageio.v2 as imageio
 from math import pi
 import numpy as np
 import os
-from typing import Literal
 
 from probo_sim.environment import Environment
 from probo_sim.graph_slam import GraphSLAM, OdomFactor, PingFactor, PriorFactor
 from probo_sim.robots import DifferentialDrive, DifferentialDriveState, DifferentialDriveControl
 from probo_sim.sensors import GPS, Pinger, PingerState
-from probo_sim.simulator import Simulator, RobotControl, SensorState
+from probo_sim.simulator import Simulator, RobotControl, SensorState, open_loop
 from probo_sim.utils import Bounds, Vector, Pose
 from probo_sim.visualizer import Visualizer
 
@@ -51,7 +50,7 @@ gt_landmarks = [
 sim = Simulator(
     environment,
     [
-        RobotControl(diff_robot, diff_control),
+        RobotControl(diff_robot, open_loop(diff_control)),
     ],
     [
         SensorState(diff_gt, diff_robot),
@@ -111,7 +110,7 @@ def plot_and_save(i: int):
 gs.optimize()
 plot_and_save(0)
 
-for i, (control, pingerMeasurement) in enumerate(zip(diff_control, results[diff_pinger])):
+for i, (control, pingerMeasurement) in enumerate(zip(results[diff_robot], results[diff_pinger])):
     for j, ping in enumerate(pingerMeasurement.pings):
         if ping is None: continue
 
