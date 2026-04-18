@@ -74,6 +74,7 @@ class Simulator:
         self.sensors = sensors
         self.dt = dt
         self.i = 0
+        self.results = Results()
     
     @property
     def time(self) -> float:
@@ -106,7 +107,7 @@ class Simulator:
         
         return True
 
-    def step(self, results: Results):
+    def step(self):
         """
         Execute one timestep in the simulation
 
@@ -125,7 +126,7 @@ class Simulator:
             any_active = any_active or active
 
             if active:
-                results.append(binding.robot, control)
+                self.results.append(binding.robot, control)
 
                 new_state = binding.robot.step(control, self.dt)
 
@@ -139,7 +140,7 @@ class Simulator:
 
         return active
 
-    def measure(self, results: Results):
+    def measure(self):
         """
         Take measurements from all sensors
 
@@ -150,7 +151,7 @@ class Simulator:
         for binding in self.sensors:
             measurement = binding.sensor.measure(binding.state, self.time)
             if measurement is not None:
-                results.append(binding.sensor, measurement)
+                self.results.append(binding.sensor, measurement)
         
     def run(self) -> Results:
         """
@@ -159,14 +160,14 @@ class Simulator:
         Returns:
             a dictionary where the keys are the sensors in the simulation, and the values are the lists of measurements over time
         """
-        results = Results()
+        self.results = Results()
 
         while True:
-            any_active = self.step(results)
+            any_active = self.step()
 
             if not any_active:
                 break
 
-            self.measure(results)
+            self.measure()
             
-        return results
+        return self.results

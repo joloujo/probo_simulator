@@ -159,7 +159,7 @@ class Visualizer:
         y = np.linspace(bounds.min.y, bounds.max.y, count[1])
         z = np.array([field(Vector(x, y)) for x, y in product(x, y)])
 
-        self.plot_field_values(x, y, z, inset)
+        self.plot_field_values(x, y, z, inset, **kwargs)
     
     def plot_field_values(self, x: np.ndarray, y: np.ndarray, z: np.ndarray, inset: bool = False, **kwargs):
         X, Y = np.meshgrid(x, y)
