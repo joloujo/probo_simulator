@@ -79,8 +79,8 @@ results = sim.run()
 
 belief = GaussianProcessRegressor(
     # kernel = 1.0 * RBF([LENGTH_SCALE, LENGTH_SCALE]),
-    kernel = RBF([LENGTH_SCALE, LENGTH_SCALE], (1, 4)),
-    n_restarts_optimizer=15,
+    kernel = RBF([LENGTH_SCALE, LENGTH_SCALE], 'fixed'),
+    # n_restarts_optimizer=15,
 )
 
 belief.fit(

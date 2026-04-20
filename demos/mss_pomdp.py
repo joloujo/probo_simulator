@@ -1,5 +1,6 @@
 from itertools import product
 import numpy as np
+import random
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF
 
@@ -10,11 +11,11 @@ from probo_sim.simulator import Simulator, RobotControl, SensorState, open_loop
 from probo_sim.utils import Bounds, Vector, gaussian
 from probo_sim.visualizer import Visualizer
 
-DT = 0.1
+DT = 0.5
 SENSOR_PERIOD = 1
 VARIANCE = 0
 LENGTH_SCALE = 2.5
-B = 1
+B = 5
 
 def value_field(position: Vector) -> float:
 
@@ -56,12 +57,12 @@ def controller(sim: Simulator) -> DifferentialDriveControl | None:
     if sim.i == 0:
         return DifferentialDriveControl(1, 0)
     
-    if sim.i == 100:
+    if sim.i == 200:
         return None
 
     # Calculate belief
     belief = GaussianProcessRegressor(
-        kernel = RBF([LENGTH_SCALE, LENGTH_SCALE], (1, 4)),
+        kernel = RBF([LENGTH_SCALE, LENGTH_SCALE], 'fixed'),
     )
 
     belief.fit(
@@ -71,25 +72,42 @@ def controller(sim: Simulator) -> DifferentialDriveControl | None:
 
     # Determine the reward for each action
 
-    positions = [
-        DifferentialDrive.kinematics(
-            DifferentialDriveState(sim.results[gps][-1].pos, sim.results[gps][-1].theta, 0, 0), 
-            action,
-            DT,
-        ).pos
-        for action in action_library 
-    ]
+    current_pose = sim.results[gps][-1]
+    best_rewards: list[float] = []
+    total_rewards: list[float] = []
 
-    M = np.array([(pos.x, pos.y) for pos in positions])
+    for action in action_library:
 
-    mean, stddev = belief.predict(M, return_std=True) # type: ignore
+        best_reward = float('-inf')
+        total_reward = 0.
 
-    reward = mean + B * stddev
+        for _ in range(20):
 
-    best_action = action_library[np.argmax(reward)]
+            next_pose = DifferentialDrive.kinematics(
+                DifferentialDriveState(current_pose.pos, current_pose.theta), 
+                action,
+                DT,
+            )
+            
+            for _ in range(50):
+                next_pose = DifferentialDrive.kinematics(
+                    DifferentialDriveState(next_pose.pos, next_pose.theta), 
+                    random.choice(action_library),
+                    DT,
+                )
+            
+            mean, stddev = belief.predict([(next_pose.pos.x, next_pose.pos.x)], return_std=True) # type: ignore
 
-    if best_action.v == 0:
-        return None
+            reward = float((mean + B * stddev)[0])
+
+            total_reward += reward
+            best_reward = max(reward, best_reward)
+        
+        best_rewards.append(best_reward)
+        total_rewards.append(total_reward)
+
+    best_action = action_library[np.argmax(best_rewards)]
+    # best_action = action_library[np.argmax(total_rewards)]
 
     return best_action
 
