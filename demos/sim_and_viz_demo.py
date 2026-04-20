@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+
 from probo_sim.environment import Environment
 from probo_sim.robots import DifferentialDrive, DifferentialDriveState, DifferentialDriveControl, HolonomicDrive, HolonomicDriveState, HolonomicDriveControl
 from probo_sim.sensors import GPS, IMU, Encoder
@@ -76,13 +78,14 @@ for measurement in results[holo_odom]:
     ), DT))
 
 # Visualize the results
-viz = Visualizer()
-viz.plot_environment(environment)
+fig, ax = plt.subplots()
 
-viz.plot_poses([diff_start] + results[diff_gps], alpha=0.5, color='red')
-viz.plot_poses(diff_calculated_state, alpha=0.5, color='orange')
+Visualizer.plot_environment(ax, environment)
 
-viz.plot_poses([holo_start] + results[holo_gps], alpha=0.5, color='blue')
-viz.plot_poses(holo_calculated_state, alpha=0.5, color='green')
+Visualizer.plot_poses(ax, [diff_start] + results[diff_gps], alpha=0.5, color='red')
+Visualizer.plot_poses(ax, diff_calculated_state, alpha=0.5, color='orange')
 
-viz.show()
+Visualizer.plot_poses(ax, [holo_start] + results[holo_gps], alpha=0.5, color='blue')
+Visualizer.plot_poses(ax, holo_calculated_state, alpha=0.5, color='green')
+
+plt.show()

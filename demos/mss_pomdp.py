@@ -1,4 +1,5 @@
 from itertools import product
+import matplotlib.pyplot as plt
 import numpy as np
 import random
 from sklearn.gaussian_process import GaussianProcessRegressor
@@ -130,10 +131,11 @@ results = sim.run()
 
 
 # Visualize the results
-viz = Visualizer()
-viz.plot_environment(environment)
+fig, ax = plt.subplots()
 
-viz.plot_field(value_field, environment.bounds, levels=20)
-viz.plot_poses([robot_start] + results[gps], alpha=0.5, color='red')
+Visualizer.plot_environment(ax, environment)
 
-viz.show()
+Visualizer.plot_field(ax, value_field, environment.bounds, levels=20)
+Visualizer.plot_poses(ax, [robot_start] + results[gps], alpha=0.5, color='red')
+
+plt.show()

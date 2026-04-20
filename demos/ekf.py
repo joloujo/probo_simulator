@@ -1,4 +1,5 @@
 from math import cos, sin, hypot, atan2, pi
+import matplotlib.pyplot as plt
 import numpy as np
 import sympy
 from typing import Sequence
@@ -155,14 +156,14 @@ def run(prior: DifferentialDriveState, initial_P: np.ndarray, controls: Sequence
 xs, Ps = run(diff_start, np.zeros((3, 3)), diff_control, results[diff_pinger])
 
 # Visualize the results
-viz = Visualizer()
+fig, ax = plt.subplots()
 
-viz.plot_environment(environment)
-viz.plot_vectors(landmarks, linestyle='None', marker='*', markersize=10, color='black')
+Visualizer.plot_environment(ax, environment)
+Visualizer.plot_vectors(ax, landmarks, linestyle='None', marker='*', markersize=10, color='black')
 
-viz.plot_poses([diff_start] + results[diff_ground_truth], alpha=0.5, color='green', label='Ground Truth')
-viz.plot_poses([diff_start] + xs, alpha=0.5, color='red', label='Filtered Poses')
+Visualizer.plot_poses(ax, [diff_start] + results[diff_ground_truth], alpha=0.5, color='green', label='Ground Truth')
+Visualizer.plot_poses(ax, [diff_start] + xs, alpha=0.5, color='red', label='Filtered Poses')
 
-viz.legend(loc='upper right')
+ax.legend(loc='upper right')
 
-viz.show()
+plt.show()

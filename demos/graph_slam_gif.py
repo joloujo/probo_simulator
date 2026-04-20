@@ -1,5 +1,6 @@
 import imageio.v2 as imageio
 from math import pi
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 
@@ -75,11 +76,13 @@ def n_landmarks() -> int:
 
 n_poses = 1
 
+fig, ax = plt.subplots()
+
 def plot_and_save(i: int):
 
-    viz = Visualizer()
+    ax.clear()
 
-    viz.plot_environment(environment)
+    Visualizer.plot_environment(ax, environment)
 
     gs_landmarks: list[Vector] = []
 
@@ -94,16 +97,15 @@ def plot_and_save(i: int):
         gs_poses.append(Pose(Vector(gs.state[start], gs.state[start+1]), gs.state[start+2]))
 
 
-    viz.plot_poses([diff_start] + results[diff_gt][:n_poses-1], color='red')
-    viz.plot_vectors(gt_landmarks, linestyle='None', marker='*', ms=10, color='red')
+    Visualizer.plot_poses(ax, [diff_start] + results[diff_gt][:n_poses-1], color='red')
+    Visualizer.plot_vectors(ax, gt_landmarks, linestyle='None', marker='*', ms=10, color='red')
 
-    viz.plot_poses(gs_poses, color='blue')
+    Visualizer.plot_poses(ax, gs_poses, color='blue')
     if len(gs_landmarks) > 0:
-        viz.plot_vectors(gs_landmarks, linestyle='None', marker='*', ms=10, color='blue')
+        Visualizer.plot_vectors(ax, gs_landmarks, linestyle='None', marker='*', ms=10, color='blue')
 
     filename = f'{frames_folder}/frame_{i:02d}.png'
-    viz.save(filename)
-    viz.close()
+    plt.savefig(filename)
 
     frames.append(imageio.imread(filename))
 

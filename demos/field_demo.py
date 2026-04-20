@@ -1,4 +1,5 @@
 from itertools import product
+import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF
@@ -106,16 +107,16 @@ c_sample, std_dev = belief.predict(M, return_std=True) # type: ignore
 print(f'std of noise is: {np.std([gt - noisy for gt, noisy in zip(results[gt_field_sensor], results[field_sensor])])}')
 
 # Visualize the results
-viz = Visualizer()
+fig, ax = plt.subplots(1, 2)
 
-viz.plot_environment(environment)
-viz.plot_field_values(x, y, c_sample)
+Visualizer.plot_environment(ax[0], environment)
+Visualizer.plot_field_values(ax[0], x, y, c_sample)
 
 # viz.plot_field(value_field, environment.bounds, count=(21, 21), levels=20)
-viz.plot_poses([robot_start] + results[gps], alpha=0.5, color='red')
+Visualizer.plot_poses(ax[0], [robot_start] + results[gps], alpha=0.5, color='red')
 
-viz.plot_environment(environment, True)
-viz.plot_field_values(x, y, std_dev, inset=True, levels=50)
-viz.plot_poses([robot_start] + results[field_sensor_locations], inset=True, alpha=0.5, color='red')
+Visualizer.plot_environment(ax[1], environment)
+Visualizer.plot_field_values(ax[1], x, y, std_dev, levels=50)
+Visualizer.plot_poses(ax[1], results[field_sensor_locations], alpha=0.5, color='red')
 
-viz.show()
+plt.show()

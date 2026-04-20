@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 
 from probo_sim.environment import Environment
@@ -97,14 +98,14 @@ poses = [
 ]
 
 # Visualize the results
-viz = Visualizer()
+fig, ax = plt.subplots()
 
-viz.plot_environment(environment)
+Visualizer.plot_environment(ax, environment)
 
-viz.plot_poses([holo_start] + results[holo_ground_truth], alpha=0.5, color='green', label='Ground Truth')
-viz.plot_poses([holo_start] + results[holo_gps], alpha=0.5, color='blue', label='GPS Measurements')
-viz.plot_poses([holo_start] + poses, alpha=0.5, color='red', label='Filtered Poses')
+Visualizer.plot_poses(ax, [holo_start] + results[holo_ground_truth], alpha=0.5, color='green', label='Ground Truth')
+Visualizer.plot_poses(ax, [holo_start] + results[holo_gps], alpha=0.5, color='blue', label='GPS Measurements')
+Visualizer.plot_poses(ax, [holo_start] + poses, alpha=0.5, color='red', label='Filtered Poses')
 
-viz.legend(loc='upper right')
+ax.legend(loc='upper right')
 
-viz.show()
+plt.show()

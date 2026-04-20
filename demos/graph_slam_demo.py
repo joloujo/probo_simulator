@@ -1,4 +1,5 @@
 from math import pi
+import matplotlib.pyplot as plt
 import numpy as np
 
 from probo_sim.environment import Environment
@@ -109,14 +110,14 @@ for n in range(len(gt_landmarks)):
     i = n_poses + n*2
     gs_landmarks.append(Vector(gs.state[i], gs.state[i+1]))
 
-viz = Visualizer()
+fig, ax = plt.subplots()
 
-viz.plot_environment(environment)
+Visualizer.plot_environment(ax, environment)
 
-viz.plot_poses([diff_start] + results[diff_gt], color='red')
-viz.plot_vectors(gt_landmarks, linestyle='None', marker='*', ms=10, color='red')
+Visualizer.plot_poses(ax, [diff_start] + results[diff_gt], color='red')
+Visualizer.plot_vectors(ax, gt_landmarks, linestyle='None', marker='*', ms=10, color='red')
 
-viz.plot_poses(gs_poses, color='blue')
-viz.plot_vectors(gs_landmarks, linestyle='None', marker='*', ms=10, color='blue')
+Visualizer.plot_poses(ax, gs_poses, color='blue')
+Visualizer.plot_vectors(ax, gs_landmarks, linestyle='None', marker='*', ms=10, color='blue')
 
-viz.show()
+plt.show()
