@@ -89,7 +89,7 @@ class Visualizer:
         axes.plot(bounds_x, bounds_y, **kwargs)
 
     @classmethod
-    def plot_vector(cls, axes: Axes, vector: Vector, inset: bool = False, **kwargs):
+    def plot_vector(cls, axes: Axes, vector: Vector, **kwargs):
         """
         Display a vector on the plot
 
@@ -100,7 +100,7 @@ class Visualizer:
         axes.plot(vector.x, vector.y, **kwargs)
 
     @classmethod
-    def plot_vectors(cls, axes: Axes, vectors: Sequence[Vector], inset: bool = False, **kwargs):
+    def plot_vectors(cls, axes: Axes, vectors: Sequence[Vector], **kwargs):
         """
         Display a vector on the plot
 

@@ -1,6 +1,6 @@
 from itertools import product
 import matplotlib.pyplot as plt
-from math import sqrt
+from math import cos, sqrt, pi
 from matplotlib.axes import Axes
 import numpy as np
 import random
@@ -18,7 +18,8 @@ DT = 0.5
 SENSOR_PERIOD = 1
 VARIANCE = 0
 LENGTH_SCALE = 2.5
-B = 4
+B = 2
+DISTANCE_MULTIPLIER = 0.02
 
 E_D = 2.5
 PLANNING_ROLLOUTS = 500
@@ -66,6 +67,49 @@ belief = GaussianProcessRegressor(
 
 # Visualize the results
 fig, ax = plt.subplots(2, 2)
+
+goal = Vector()
+
+def controller_2_electric_boogaloo(sim: Simulator) -> DifferentialDriveControl | None:
+    global goal
+
+    if sim.i == 0:
+        return DifferentialDriveControl(1, 0)
+    
+    if not plt.fignum_exists(fig.number):
+        return None
+
+    current_pose = sim.results[gps][-1]
+
+    belief.fit(
+        np.asarray([(pose.pos.x, pose.pos.y) for pose in sim.results[field_sensor_locations]]), 
+        np.asarray(sim.results[field_sensor])
+    )
+
+    x = np.linspace(environment.bounds.min.x, environment.bounds.max.x, 41)
+    y = np.linspace(environment.bounds.min.y, environment.bounds.max.y, 41)
+    M = np.array(list(product(x,y)))
+    c_sample, std_dev = belief.predict(M, return_std=True) # type: ignore
+
+    distance = np.linalg.norm(M - np.array([[current_pose.pos.x, current_pose.pos.y]]), axis=1)
+
+    print(distance)
+
+    reward = c_sample + sqrt(B) * std_dev - distance * DISTANCE_MULTIPLIER
+
+    goal_tuple = M[np.argmax(reward)]
+    goal = Vector(goal_tuple[0], goal_tuple[1])
+
+    diff = goal - current_pose.pos
+
+    if diff.r < 0.1: return None
+
+    angle = (diff.theta - current_pose.theta + pi) % (2 * pi) - pi
+    v = min(cos(angle), diff.r)
+    w = max(-1, min(angle, 1))
+
+    return DifferentialDriveControl(v, w)
+
 
 def controller(sim: Simulator) -> DifferentialDriveControl | None:
 
@@ -181,7 +225,10 @@ def plot(sim: Simulator):
     M = np.array(list(product(x,y)))
     c_sample, std_dev = belief.predict(M, return_std=True) # type: ignore
 
-    reward = c_sample + sqrt(B) * std_dev
+    current_pose = sim.results[gps][-1]
+    distance = np.linalg.norm(M - np.array([[current_pose.pos.x, current_pose.pos.y]]), axis=1)
+
+    reward = c_sample + sqrt(B) * std_dev - distance * DISTANCE_MULTIPLIER
 
     Visualizer.plot_field(ground_truth_plot, value_field, environment.bounds, levels=np.linspace(0, 1.1, 23))
     Visualizer.plot_field_values(belief_plot, x, y, c_sample, levels=np.linspace(0, 1.1, 23))
@@ -189,13 +236,14 @@ def plot(sim: Simulator):
     Visualizer.plot_field_values(planning_plot, x, y, reward, levels=20)
 
     Visualizer.plot_poses(ground_truth_plot, [robot_start] + sim.results[gps], alpha=0.5, color='red')
+    Visualizer.plot_vector(planning_plot, goal, marker='x', ms=3, mec='red')
 
     plt.pause(0.1)
 
 sim = Simulator(
     environment,
     [
-        RobotControl(robot, controller),
+        RobotControl(robot, controller_2_electric_boogaloo),
     ],
     [
         SensorState(gps, robot),
