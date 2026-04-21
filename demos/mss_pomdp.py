@@ -18,7 +18,11 @@ DT = 0.5
 SENSOR_PERIOD = 1
 VARIANCE = 0
 LENGTH_SCALE = 2.5
-B = 1
+B = 4
+
+E_D = 2.5
+PLANNING_ROLLOUTS = 500
+HORIZON = 50
 
 def value_field(position: Vector) -> float:
 
@@ -52,7 +56,7 @@ field_sensor_locations = GPS(SENSOR_PERIOD)
 
 action_library: list[DifferentialDriveControl] = [
     DifferentialDriveControl(v, w)
-    for (v, w) in product(np.linspace(0., 1., 3), np.linspace(-2, 2, 9))
+    for (v, w) in product(np.linspace(0., 1., 3), np.linspace(-3, 3, 13))
 ]
 
 # Calculate belief
@@ -82,41 +86,81 @@ def controller(sim: Simulator) -> DifferentialDriveControl | None:
     # Determine the reward for each action
 
     current_pose = sim.results[gps][-1]
-    best_rewards: list[float] = []
-    total_rewards: list[float] = []
+    # total_reward_accumulated: list[float] = [0.] * len(action_library)
 
-    for action in action_library:
+    # for i, action in enumerate(action_library):
+    #     next_state = DifferentialDrive.kinematics(
+    #         DifferentialDriveState(current_pose.pos, current_pose.theta), 
+    #         action,
+    #         DT,
+    #     )
 
-        best_reward = float('-inf')
-        total_reward = 0.
+    #     for _ in range(20):
+    #         state = [next_state]
 
-        for _ in range(100):
+    #         for _ in range(HORIZON - 1):
+    #             state.append(DifferentialDrive.kinematics(
+    #                 DifferentialDriveState(state[-1].pos, state[-1].theta), 
+    #                 random.choice(action_library),
+    #                 DT,
+    #             ))
+            
+    #         mean, stddev = belief.predict([(s.pos.x, s.pos.y) for s in state], return_std=True) # type: ignore
 
-            next_pose = DifferentialDrive.kinematics(
-                DifferentialDriveState(current_pose.pos, current_pose.theta), 
-                action,
+    #         reward = sum(mean + np.sqrt(B) * stddev)
+
+    #         total_reward_accumulated[i] += reward
+
+    action_next_state = [
+        DifferentialDrive.kinematics(
+            DifferentialDriveState(current_pose.pos, current_pose.theta), 
+            action,
+            DT,
+        )
+        for action in action_library
+    ]
+    total_reward_accumulated = np.zeros((len(action_library)))
+    times_simulated = np.zeros((len(action_library)))
+
+    for _ in range(PLANNING_ROLLOUTS):
+        # Select action to test
+
+        total_times_simulated = sum(times_simulated)
+        average_reward_across_all = sum(total_reward_accumulated) / total_times_simulated
+
+        Q_star = np.array([
+            Q / N + sqrt(total_times_simulated ** E_D / N)
+            if N != 0 
+            else float('inf')
+            for Q, N, in zip(total_reward_accumulated, times_simulated)
+        ])
+
+        selected_action_index = np.argmax(Q_star)
+
+        state = [action_next_state[selected_action_index]]
+
+        for _ in range(HORIZON - 1):
+
+            state.append(DifferentialDrive.kinematics(
+                DifferentialDriveState(state[-1].pos, state[-1].theta), 
+                random.choice(action_library),
                 DT,
-            )
-            
-            for _ in range(20):
-                next_pose = DifferentialDrive.kinematics(
-                    DifferentialDriveState(next_pose.pos, next_pose.theta), 
-                    random.choice(action_library),
-                    DT,
-                )
-            
-            mean, stddev = belief.predict([(next_pose.pos.x, next_pose.pos.x)], return_std=True) # type: ignore
+            ))
 
-            reward = float((mean + sqrt(B) * stddev)[0])
+            mean, stddev = belief.predict([(s.pos.x, s.pos.y) for s in state], return_std=True) # type: ignore
 
-            total_reward += reward
-            best_reward = max(reward, best_reward)
-        
-        best_rewards.append(best_reward)
-        total_rewards.append(total_reward)
+            reward = sum(mean + np.sqrt(B) * stddev)
 
-    best_action = action_library[np.argmax(best_rewards)]
-    # best_action = action_library[np.argmax(total_rewards)]
+            total_reward_accumulated[selected_action_index] += reward
+
+        times_simulated[selected_action_index] += 1
+
+    # print(times_simulated)
+    
+    average_reward = [Q / N for Q, N, in zip(total_reward_accumulated, times_simulated)]
+
+    best_action = action_library[np.argmax(average_reward)]
+    # best_action = action_library[np.argmax(total_reward_accumulated)]
 
     return best_action
 
