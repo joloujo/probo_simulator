@@ -1,5 +1,7 @@
 from itertools import product
 import matplotlib.pyplot as plt
+from math import sqrt
+from matplotlib.axes import Axes
 import numpy as np
 import random
 from sklearn.gaussian_process import GaussianProcessRegressor
@@ -16,7 +18,7 @@ DT = 0.5
 SENSOR_PERIOD = 1
 VARIANCE = 0
 LENGTH_SCALE = 2.5
-B = 5
+B = 1
 
 def value_field(position: Vector) -> float:
 
@@ -50,21 +52,27 @@ field_sensor_locations = GPS(SENSOR_PERIOD)
 
 action_library: list[DifferentialDriveControl] = [
     DifferentialDriveControl(v, w)
-    for (v, w) in product([-1.0, -0.5, 0.0, 0.5, 1.0], [-1.0, -0.5, 0.0, 0.5, 1.0])
+    for (v, w) in product(np.linspace(0., 1., 3), np.linspace(-2, 2, 9))
 ]
+
+# Calculate belief
+belief = GaussianProcessRegressor(
+    kernel = RBF([LENGTH_SCALE, LENGTH_SCALE], 'fixed'),
+)
+
+# Visualize the results
+fig, ax = plt.subplots(2, 2)
 
 def controller(sim: Simulator) -> DifferentialDriveControl | None:
 
     if sim.i == 0:
         return DifferentialDriveControl(1, 0)
     
-    if sim.i == 200:
+    if not plt.fignum_exists(fig.number):
         return None
 
-    # Calculate belief
-    belief = GaussianProcessRegressor(
-        kernel = RBF([LENGTH_SCALE, LENGTH_SCALE], 'fixed'),
-    )
+    if sim.i == 1000:
+        return None
 
     belief.fit(
         np.asarray([(pose.pos.x, pose.pos.y) for pose in sim.results[field_sensor_locations]]), 
@@ -82,7 +90,7 @@ def controller(sim: Simulator) -> DifferentialDriveControl | None:
         best_reward = float('-inf')
         total_reward = 0.
 
-        for _ in range(20):
+        for _ in range(100):
 
             next_pose = DifferentialDrive.kinematics(
                 DifferentialDriveState(current_pose.pos, current_pose.theta), 
@@ -90,7 +98,7 @@ def controller(sim: Simulator) -> DifferentialDriveControl | None:
                 DT,
             )
             
-            for _ in range(50):
+            for _ in range(20):
                 next_pose = DifferentialDrive.kinematics(
                     DifferentialDriveState(next_pose.pos, next_pose.theta), 
                     random.choice(action_library),
@@ -99,7 +107,7 @@ def controller(sim: Simulator) -> DifferentialDriveControl | None:
             
             mean, stddev = belief.predict([(next_pose.pos.x, next_pose.pos.x)], return_std=True) # type: ignore
 
-            reward = float((mean + B * stddev)[0])
+            reward = float((mean + sqrt(B) * stddev)[0])
 
             total_reward += reward
             best_reward = max(reward, best_reward)
@@ -112,6 +120,34 @@ def controller(sim: Simulator) -> DifferentialDriveControl | None:
 
     return best_action
 
+ground_truth_plot: Axes = ax[0, 0]
+belief_plot: Axes = ax[1, 0]
+uncertainty_plot: Axes = ax[1, 1]
+planning_plot: Axes = ax[0, 1]
+
+def plot(sim: Simulator):
+    for axis in ax.flatten():
+        Visualizer.plot_environment(axis, environment)
+        axis.clear()
+
+    ground_truth_plot.text(0, 1.05, f'Time: {sim.time}', transform=ground_truth_plot.transAxes)
+
+    x = np.linspace(environment.bounds.min.x, environment.bounds.max.x, 21)
+    y = np.linspace(environment.bounds.min.y, environment.bounds.max.y, 21)
+    M = np.array(list(product(x,y)))
+    c_sample, std_dev = belief.predict(M, return_std=True) # type: ignore
+
+    reward = c_sample + sqrt(B) * std_dev
+
+    Visualizer.plot_field(ground_truth_plot, value_field, environment.bounds, levels=np.linspace(0, 1.1, 23))
+    Visualizer.plot_field_values(belief_plot, x, y, c_sample, levels=np.linspace(0, 1.1, 23))
+    Visualizer.plot_field_values(uncertainty_plot, x, y, std_dev, levels=20)
+    Visualizer.plot_field_values(planning_plot, x, y, reward, levels=20)
+
+    Visualizer.plot_poses(ground_truth_plot, [robot_start] + sim.results[gps], alpha=0.5, color='red')
+
+    plt.pause(0.1)
+
 sim = Simulator(
     environment,
     [
@@ -123,19 +159,11 @@ sim = Simulator(
         SensorState(field_sensor, InsituInstrumentState(robot, value_field)),
         SensorState(field_sensor_locations, robot),
     ],
-    DT
+    DT,
+    renderer=plot
 )
 
 # Run the simulator
 results = sim.run()
-
-
-# Visualize the results
-fig, ax = plt.subplots()
-
-Visualizer.plot_environment(ax, environment)
-
-Visualizer.plot_field(ax, value_field, environment.bounds, levels=20)
-Visualizer.plot_poses(ax, [robot_start] + results[gps], alpha=0.5, color='red')
 
 plt.show()

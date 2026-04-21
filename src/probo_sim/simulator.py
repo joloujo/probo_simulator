@@ -59,6 +59,7 @@ class Simulator:
         robots: Collection[RobotControl],
         sensors: Collection[SensorState],
         dt: float,
+        renderer: Callable[['Simulator'], Any] | None = None
     ) -> None:
         """
         Create the simulator
@@ -75,6 +76,7 @@ class Simulator:
         self.dt = dt
         self.i = 0
         self.results = Results()
+        self.renderer = renderer
     
     @property
     def time(self) -> float:
@@ -169,5 +171,8 @@ class Simulator:
                 break
 
             self.measure()
+
+            if self.renderer is not None:
+                self.renderer(self)
             
         return self.results
