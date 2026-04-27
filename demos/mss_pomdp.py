@@ -67,6 +67,8 @@ belief = GaussianProcessRegressor(
 
 # Visualize the results
 fig, ax = plt.subplots(2, 2)
+manager = plt.get_current_fig_manager()
+manager.resize(*manager.window.maxsize()) # type: ignore
 
 goal = Vector()
 
@@ -217,6 +219,11 @@ def plot(sim: Simulator):
     for axis in ax.flatten():
         Visualizer.plot_environment(axis, environment)
         axis.clear()
+
+    ground_truth_plot.set_title('Ground Truth')
+    belief_plot.set_title('Belief')
+    uncertainty_plot.set_title('Uncertainty')
+    planning_plot.set_title('Reward')
 
     ground_truth_plot.text(0, 1.05, f'Time: {sim.time}', transform=ground_truth_plot.transAxes)
 
