@@ -1,8 +1,8 @@
 from probo_sim.environment import Environment
 from probo_sim.robots import DifferentialDrive, DifferentialDriveState, DifferentialDriveControl, HolonomicDrive, HolonomicDriveState, HolonomicDriveControl
 from probo_sim.sensors import GPS, IMU, Encoder
-from probo_sim.simulator import Simulator, RobotControl, SensorState
-from probo_sim.utils import Bounds, Vector, Pose
+from probo_sim.simulator import Simulator, RobotControl, SensorState, open_loop
+from probo_sim.utils import Bounds, Vector
 from probo_sim.visualizer import Visualizer
 
 DT = 0.1
@@ -45,8 +45,8 @@ holo_odom = IMU(0)
 sim = Simulator(
     environment,
     [
-        RobotControl(diff_robot, diff_control),
-        RobotControl(holo_robot, holo_control),
+        RobotControl(diff_robot, open_loop(diff_control)),
+        RobotControl(holo_robot, open_loop(holo_control)),
     ],
     [
         SensorState(diff_gps, diff_robot),

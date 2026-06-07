@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from math import sqrt
 from random import gauss
 from typing import Generic, Sequence, TypeVar
 
 from probo_sim.robots import Robot, DifferentialDrive, HolonomicDrive
-from probo_sim.utils import Pose, Vector
+from probo_sim.utils import Pose, Vector, Field
 
 State = TypeVar("State") 
 Measurement = TypeVar("Measurement")
@@ -135,7 +135,7 @@ class PingerState:
 
 @dataclass
 class PingerMeasurement:
-    pings: Sequence[Vector]
+    pings: Sequence[Vector | None]
 
 class Pinger(Sensor[PingerState, PingerMeasurement]):
     def __init__(self, range: float, period: float, variance: tuple[float, float] = (0.0, 0.0)) -> None:
@@ -161,11 +161,32 @@ class Pinger(Sensor[PingerState, PingerMeasurement]):
             Vector.polar(
                 gauss(ping.r, sqrt(self.variance[0])),
                 gauss(ping.theta, sqrt(self.variance[1]))
-            ) for ping in measurement.pings
+            ) if ping is not None else None for ping in measurement.pings
         ]
 
         ranged_pings = [
-            ping for ping in noisy_pings if ping.r <= self.range
+            ping if ping is not None and ping.r <= self.range 
+            else None 
+            for ping in noisy_pings
         ]
 
         return PingerMeasurement(ranged_pings)
+
+
+@dataclass
+class InsituInstrumentState:
+    robot: Robot
+    field: Field
+
+class InsituInstrument(Sensor[InsituInstrumentState, float]):
+    def __init__(self, period: float, variance: float = 0.0) -> None:
+        super().__init__(period)
+        self.variance = variance
+
+    def ground_truth(self, state: InsituInstrumentState) -> float:
+        return state.field(state.robot.state.pos)
+    
+    def noisify(self, measurement: float) -> float:
+        noisy = gauss(measurement, sqrt(self.variance))
+
+        return noisy if noisy > 0.0 else 0.0

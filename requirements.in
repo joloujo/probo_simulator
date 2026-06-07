@@ -1,4 +1,9 @@
 -e .
+imageio
+lark
 matplotlib
 numpy
 pytest
+scikit-learn
+sympy
+PyYAML
